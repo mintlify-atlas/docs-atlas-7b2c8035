@@ -1,0 +1,697 @@
+---
+title: 'Deployment'
+description: 'Deploy the credit score API and web client using Docker and docker-compose'
+icon: 'rocket'
+---
+
+This guide covers deploying the complete AI Data Science Service stack using Docker containers for production-ready, scalable deployments.
+
+## Overview
+
+The deployment architecture consists of two containerized services:
+
+1. **API Service**: FastAPI backend for model inference
+2. **Client Service**: Web interface for interactive predictions
+
+Both services are orchestrated using `docker-compose` for simplified management.
+
+## Prerequisites
+
+<Steps>
+  <Step title="Install Docker">
+    Ensure Docker is installed on your system:
+
+    ```bash
+    docker --version
+    ```
+
+    <Note>
+    Download Docker from [docker.com](https://www.docker.com/get-started) if not installed.
+    </Note>
+  </Step>
+
+  <Step title="Install Docker Compose">
+    Verify docker-compose is available:
+
+    ```bash
+    docker-compose --version
+    ```
+
+    Docker Compose is included with Docker Desktop on macOS and Windows.
+  </Step>
+
+  <Step title="Train a Model">
+    Ensure you have trained model files:
+    - `model/model_weights_001.pth`
+    - `config/models-configs/model_config_001.yaml`
+    - `processing/preprocessor.joblib`
+
+    See the [Training Models](/guides/training-models) guide if needed.
+  </Step>
+</Steps>
+
+## Docker Architecture
+
+### Service Configuration
+
+The `docker-compose.yml` defines the complete service stack:
+
+```yaml
+services:
+  api-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: credit-score-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./server:/app/server
+      - ./inference:/app/inference
+      - ./config:/app/config
+      - ./model:/app/model
+      - ./processing:/app/processing
+    networks:
+      - credit-score-network
+    command: uvicorn server.api:app --host 0.0.0.0 --port 8000 --reload
+
+  client-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+    container_name: credit-score-client
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./examples/client_web:/app
+    environment:
+      - API_URL=http://localhost:8000
+    networks:
+      - credit-score-network
+    command: uvicorn main:app --host 0.0.0.0 --port 3000 --reload
+
+networks:
+  credit-score-network:
+    driver: bridge
+```
+
+Reference: `docker-compose.yml:1-41`
+
+## API Service Container
+
+### Dockerfile Configuration
+
+The API container is built using a multi-stage, security-hardened Dockerfile:
+
+```dockerfile
+# Base image with Python 3.11
+FROM python:3.11-slim
+
+# Environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Create non-root user for security
+RUN useradd -m -u 1000 appuser
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY config/ config/
+COPY inference/ inference/
+COPY model/ model/
+COPY processing/ processing/
+COPY server/ server/
+
+# Set ownership to non-root user
+RUN chown -R appuser:appuser /app
+
+USER appuser
+
+EXPOSE 8000
+
+CMD ["uvicorn", "server.api:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+Reference: `Dockerfile.api:1-43`
+
+### Security Features
+
+<CardGroup cols={2}>
+  <Card title="Non-root User" icon="user-shield">
+    Container runs as `appuser` (UID 1000) instead of root, limiting potential security risks.
+  </Card>
+  <Card title="Minimal Base Image" icon="layer-group">
+    Uses `python:3.11-slim` to reduce attack surface and image size.
+  </Card>
+  <Card title="No Cache Files" icon="broom">
+    `--no-cache-dir` flag prevents storing unnecessary pip cache, reducing image size.
+  </Card>
+  <Card title="Unbuffered Output" icon="stream">
+    `PYTHONUNBUFFERED=1` ensures logs are immediately visible for monitoring.
+  </Card>
+</CardGroup>
+
+## Deployment Methods
+
+### Quick Start: Full Stack Deployment
+
+Deploy both services with a single command:
+
+```bash
+docker-compose up --build
+```
+
+<Accordion title="What happens during deployment?">
+  1. **Build Phase**:
+     - Builds API container from `Dockerfile.api`
+     - Builds Client container from `Dockerfile.client`
+     - Installs all dependencies
+     - Copies application code
+
+  2. **Network Setup**:
+     - Creates `credit-score-network` bridge network
+     - Enables inter-container communication
+
+  3. **Service Launch**:
+     - Starts API service on port 8000
+     - Starts Client service on port 3000
+     - Mounts volumes for hot-reloading
+
+  4. **Ready State**:
+     - API available at `http://localhost:8000`
+     - Client available at `http://localhost:3000`
+     - API docs at `http://localhost:8000/docs`
+</Accordion>
+
+### Development Mode (Hot Reload)
+
+For development with automatic code reloading:
+
+```bash
+docker-compose up
+```
+
+<Note>
+Volume mounts in `docker-compose.yml` enable hot-reloading. Changes to local files are immediately reflected in containers.
+</Note>
+
+### Production Mode (Detached)
+
+Run services in the background:
+
+```bash
+docker-compose up -d --build
+```
+
+Manage services:
+
+<CodeGroup>
+```bash View Logs
+docker-compose logs -f
+```
+
+```bash Check Status
+docker-compose ps
+```
+
+```bash Stop Services
+docker-compose down
+```
+
+```bash Restart Services
+docker-compose restart
+```
+</CodeGroup>
+
+## Service-Specific Deployment
+
+### Deploy Only API Service
+
+```bash
+docker-compose up --build api-service
+```
+
+Access the API:
+- **Base URL**: `http://localhost:8000`
+- **Documentation**: `http://localhost:8000/docs`
+- **Health Check**: `http://localhost:8000` (redirects to docs)
+
+Reference: `server/api.py:50-55`
+
+### Deploy Only Client Service
+
+```bash
+docker-compose up --build client-service
+```
+
+<Warning>
+The client requires the API service to be running. Ensure API is accessible before starting the client.
+</Warning>
+
+## Volume Mounts for Development
+
+The docker-compose configuration mounts local directories for hot-reloading:
+
+```yaml
+volumes:
+  # Hot-reloading: map local directories to container
+  - ./server:/app/server
+  - ./inference:/app/inference
+  - ./config:/app/config
+  - ./model:/app/model
+  - ./processing:/app/processing
+```
+
+Reference: `docker-compose.yml:9-15`
+
+**Benefits:**
+- Instant code updates without rebuilding
+- Local file editing with IDE
+- Simplified debugging
+- Faster development iteration
+
+<Tip>
+For production, remove volume mounts to bake code into the image for better performance and security.
+</Tip>
+
+## Networking
+
+Services communicate through a dedicated bridge network:
+
+```yaml
+networks:
+  credit-score-network:
+    driver: bridge
+```
+
+Reference: `docker-compose.yml:39-41`
+
+### Inter-Service Communication
+
+Containers can reference each other by service name:
+
+```javascript
+// From client-service container
+fetch('http://api-service:8000/credit_score_prediction', {
+  method: 'POST',
+  body: JSON.stringify(data)
+});
+```
+
+### External Access
+
+Port mappings expose services to the host machine:
+
+- **API**: `localhost:8000` → `api-service:8000`
+- **Client**: `localhost:3000` → `client-service:3000`
+
+## Environment Configuration
+
+The client service uses environment variables for configuration:
+
+```yaml
+environment:
+  - API_URL=http://localhost:8000
+```
+
+Reference: `docker-compose.yml:31-33`
+
+Customize for different environments:
+
+<Tabs>
+  <Tab title="Development">
+    ```yaml
+    environment:
+      - API_URL=http://localhost:8000
+      - DEBUG=true
+    ```
+  </Tab>
+  <Tab title="Staging">
+    ```yaml
+    environment:
+      - API_URL=https://staging-api.example.com
+      - DEBUG=false
+    ```
+  </Tab>
+  <Tab title="Production">
+    ```yaml
+    environment:
+      - API_URL=https://api.example.com
+      - DEBUG=false
+      - LOG_LEVEL=warning
+    ```
+  </Tab>
+</Tabs>
+
+## Production Deployment Best Practices
+
+<Steps>
+  <Step title="Remove Development Features">
+    Modify `docker-compose.yml` for production:
+
+    ```yaml
+    # Remove --reload flag
+    command: uvicorn server.api:app --host 0.0.0.0 --port 8000
+
+    # Remove volume mounts
+    # volumes:
+    #   - ./server:/app/server
+    ```
+  </Step>
+
+  <Step title="Configure Resource Limits">
+    Add resource constraints to prevent resource exhaustion:
+
+    ```yaml
+    api-service:
+      # ... existing config
+      deploy:
+        resources:
+          limits:
+            cpus: '1'
+            memory: 2G
+          reservations:
+            cpus: '0.5'
+            memory: 1G
+    ```
+  </Step>
+
+  <Step title="Use Environment Files">
+    Store sensitive configuration in `.env` files:
+
+    ```bash .env
+    MODEL_VERSION=001
+    LOG_LEVEL=info
+    API_KEY=your-secret-key
+    ```
+
+    Reference in docker-compose:
+
+    ```yaml
+    api-service:
+      env_file:
+        - .env
+    ```
+  </Step>
+
+  <Step title="Implement Health Checks">
+    Add health checks for monitoring:
+
+    ```yaml
+    api-service:
+      healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+        interval: 30s
+        timeout: 10s
+        retries: 3
+        start_period: 40s
+    ```
+  </Step>
+
+  <Step title="Enable Logging">
+    Configure log drivers for centralized logging:
+
+    ```yaml
+    api-service:
+      logging:
+        driver: "json-file"
+        options:
+          max-size: "10m"
+          max-file: "3"
+    ```
+  </Step>
+</Steps>
+
+## Scaling Deployments
+
+### Horizontal Scaling
+
+Run multiple API instances behind a load balancer:
+
+```bash
+docker-compose up --scale api-service=3
+```
+
+<Warning>
+Port conflicts will occur with multiple instances using the same port. Use a reverse proxy or load balancer.
+</Warning>
+
+### Example with NGINX Load Balancer
+
+```yaml
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - api-service
+
+  api-service:
+    # Remove ports mapping
+    expose:
+      - "8000"
+    deploy:
+      replicas: 3
+```
+
+## Monitoring and Observability
+
+### View Service Logs
+
+<CodeGroup>
+```bash All Services
+docker-compose logs -f
+```
+
+```bash Specific Service
+docker-compose logs -f api-service
+```
+
+```bash Last 100 Lines
+docker-compose logs --tail=100 api-service
+```
+
+```bash Since Timestamp
+docker-compose logs --since 2024-01-01T00:00:00 api-service
+```
+</CodeGroup>
+
+### Container Metrics
+
+Monitor resource usage:
+
+```bash
+docker stats credit-score-api credit-score-client
+```
+
+Output shows:
+- CPU usage percentage
+- Memory usage and limit
+- Network I/O
+- Block I/O
+
+### Access Running Container
+
+For debugging, access a running container:
+
+```bash
+docker exec -it credit-score-api /bin/bash
+```
+
+Inside the container:
+
+```bash
+# Check files
+ls -la /app/model/
+
+# Test API internally
+curl http://localhost:8000/docs
+
+# View Python packages
+pip list
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Port already in use">
+    **Error**: `Bind for 0.0.0.0:8000 failed: port is already allocated`
+
+    **Solution**:
+    ```bash
+    # Find process using the port
+    lsof -i :8000
+    
+    # Kill the process
+    kill -9 <PID>
+    
+    # Or change port in docker-compose.yml
+    ports:
+      - "8080:8000"
+    ```
+  </Accordion>
+
+  <Accordion title="Container exits immediately">
+    **Debugging steps**:
+    ```bash
+    # View container logs
+    docker-compose logs api-service
+    
+    # Check container status
+    docker-compose ps
+    
+    # Inspect container
+    docker inspect credit-score-api
+    ```
+
+    Common causes:
+    - Missing dependencies
+    - File permission issues
+    - Configuration errors
+  </Accordion>
+
+  <Accordion title="Cannot connect to API from client">
+    **Solution**:
+    
+    1. Verify both services are running:
+       ```bash
+       docker-compose ps
+       ```
+
+    2. Check network connectivity:
+       ```bash
+       docker exec credit-score-client ping api-service
+       ```
+
+    3. Verify API_URL environment variable:
+       ```bash
+       docker exec credit-score-client env | grep API_URL
+       ```
+  </Accordion>
+
+  <Accordion title="Volume mount permissions error">
+    **Error**: `Permission denied` when accessing mounted files
+
+    **Solution**:
+    ```bash
+    # Fix file permissions
+    sudo chown -R $USER:$USER .
+    
+    # Or run with sudo (not recommended for production)
+    sudo docker-compose up
+    ```
+  </Accordion>
+
+  <Accordion title="Out of memory errors">
+    **Solution**:
+    
+    Increase Docker memory allocation:
+    - **Docker Desktop**: Settings → Resources → Memory
+    - **Linux**: Modify `/etc/docker/daemon.json`
+    
+    Or add memory limits to containers:
+    ```yaml
+    api-service:
+      mem_limit: 2g
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Cleanup
+
+### Stop and Remove Containers
+
+```bash
+# Stop services
+docker-compose down
+
+# Stop and remove volumes
+docker-compose down -v
+
+# Stop and remove images
+docker-compose down --rmi all
+```
+
+### Remove Unused Docker Resources
+
+```bash
+# Remove dangling images
+docker image prune
+
+# Remove all unused containers, networks, images
+docker system prune -a
+```
+
+<Warning>
+`docker system prune -a` removes ALL unused Docker resources. Use with caution.
+</Warning>
+
+## Advanced Deployment Options
+
+### Docker Swarm
+
+For orchestrated, multi-node deployments:
+
+```bash
+# Initialize swarm
+docker swarm init
+
+# Deploy stack
+docker stack deploy -c docker-compose.yml credit-score
+```
+
+### Kubernetes
+
+For production-grade orchestration, convert to Kubernetes manifests using Kompose:
+
+```bash
+# Install kompose
+curl -L https://github.com/kubernetes/kompose/releases/download/v1.28.0/kompose-linux-amd64 -o kompose
+chmod +x kompose
+
+# Convert docker-compose to Kubernetes
+./kompose convert
+
+# Deploy to Kubernetes
+kubectl apply -f .
+```
+
+### Cloud Deployments
+
+<CardGroup cols={3}>
+  <Card title="AWS ECS" icon="aws">
+    Deploy using Amazon Elastic Container Service with Fargate for serverless containers.
+  </Card>
+  <Card title="Google Cloud Run" icon="google">
+    Deploy directly from container images with automatic scaling.
+  </Card>
+  <Card title="Azure Container Instances" icon="microsoft">
+    Simple container hosting on Microsoft Azure.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Running Inference" icon="play" href="/guides/running-inference">
+    Test your deployed API with predictions
+  </Card>
+  <Card title="MLflow Tracking" icon="chart-line" href="/guides/mlflow-tracking">
+    Monitor deployed model performance
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/inference/overview">
+    Explore complete API documentation
+  </Card>
+  <Card title="Model Configuration" icon="sliders" href="/guides/model-configuration">
+    Customize models for production
+  </Card>
+</CardGroup>

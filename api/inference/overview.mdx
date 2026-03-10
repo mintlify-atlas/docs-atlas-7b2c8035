@@ -1,0 +1,184 @@
+---
+title: 'Inference API Overview'
+description: 'FastAPI-based credit score prediction service with deep learning model inference'
+---
+
+## Introduction
+
+The Inference API is a FastAPI-based service that provides credit risk prediction capabilities using a deep learning model. The API predicts whether a customer's credit risk is "good" or "bad" based on various customer attributes.
+
+## Base URL
+
+```
+http://localhost:8000
+```
+
+## API Information
+
+<ParamField path="title" type="string">
+  Credit Score Prediction API
+</ParamField>
+
+<ParamField path="version" type="string">
+  1.0.0
+</ParamField>
+
+<ParamField path="description" type="string">
+  API to predict the credit risk of a customer using a deep learning model
+</ParamField>
+
+## Authentication
+
+Currently, the API does not require authentication. It is configured with CORS middleware to allow requests from any origin (`*`).
+
+<Warning>
+  In production environments, you should limit the allowed origins to specific trusted domains for security.
+</Warning>
+
+## CORS Configuration
+
+The API is configured with the following CORS settings:
+
+- **Allow Origins**: `*` (all origins)
+- **Allow Credentials**: `true`
+- **Allow Methods**: `*` (all methods)
+- **Allow Headers**: `*` (all headers)
+
+## Architecture
+
+The API uses a singleton pattern for model inference, ensuring efficient resource usage:
+
+1. **Model Loading**: The deep learning model is loaded once at startup from `model_weights_001.pth`
+2. **Preprocessor**: A scikit-learn preprocessor (`preprocessor.joblib`) handles feature engineering
+3. **Configuration**: Model architecture is defined in `model_config_001.yaml`
+4. **Inference Engine**: PyTorch-based neural network runs on CPU for predictions
+
+## Interactive Documentation
+
+FastAPI automatically generates interactive API documentation:
+
+- **Swagger UI**: Available at `/docs`
+- **ReDoc**: Available at `/redoc`
+- **Root Endpoint**: Redirects to `/docs`
+
+## Client Examples
+
+<CodeGroup>
+
+```python Python
+import requests
+
+base_url = "http://localhost:8000"
+
+# Make a prediction request
+payload = {
+    "Age": 35,
+    "Sex": "male",
+    "Job": "unskilled and resident",
+    "Housing": "free",
+    "Saving accounts": "NA",
+    "Checking account": "NA",
+    "Credit amount": 9055,
+    "Duration": 36,
+    "Purpose": "education"
+}
+
+response = requests.post(
+    f"{base_url}/credit_score_prediction",
+    json=payload
+)
+
+result = response.json()
+print(f"Prediction: {result['prediction']}")
+print(f"Probability: {result['probability']}")
+```
+
+```javascript JavaScript
+const baseUrl = "http://localhost:8000";
+
+const payload = {
+  Age: 35,
+  Sex: "male",
+  Job: "unskilled and resident",
+  Housing: "free",
+  "Saving accounts": "NA",
+  "Checking account": "NA",
+  "Credit amount": 9055,
+  Duration: 36,
+  Purpose: "education"
+};
+
+fetch(`${baseUrl}/credit_score_prediction`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify(payload)
+})
+  .then(response => response.json())
+  .then(data => {
+    console.log(`Prediction: ${data.prediction}`);
+    console.log(`Probability: ${data.probability}`);
+  });
+```
+
+```bash cURL
+curl -X POST "http://localhost:8000/credit_score_prediction" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "Age": 35,
+    "Sex": "male",
+    "Job": "unskilled and resident",
+    "Housing": "free",
+    "Saving accounts": "NA",
+    "Checking account": "NA",
+    "Credit amount": 9055,
+    "Duration": 36,
+    "Purpose": "education"
+  }'
+```
+
+</CodeGroup>
+
+## Error Handling
+
+The API returns standard HTTP status codes:
+
+- **200**: Successful prediction
+- **422**: Validation error (invalid input data)
+- **500**: Internal server error during inference
+
+<Expandable title="Example Error Response">
+
+```json
+{
+  "detail": "An error occurred during inference: <error message>"
+}
+```
+
+</Expandable>
+
+## Running the Server
+
+Start the API server using uvicorn:
+
+```bash
+uvicorn server.api:app --reload --port 8000
+```
+
+Or with uv:
+
+```bash
+uv run uvicorn server.api:app --reload --port 8000
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Credit Score Prediction" icon="brain" href="/api/inference/predict">
+    Learn about the prediction endpoint
+  </Card>
+  <Card title="API Schema" icon="code" href="/api/inference/predict#request-schema">
+    View complete request/response schemas
+  </Card>
+</CardGroup>

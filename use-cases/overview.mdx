@@ -1,0 +1,161 @@
+---
+title: Use Cases Overview
+description: Explore real-world AI and machine learning implementations across various industries
+icon: lightbulb
+---
+
+The AI Data Science Service platform demonstrates the full lifecycle of data science projects—from exploratory analysis to production-ready deployments. This section showcases practical implementations across diverse industries, highlighting how MLOps and DevOps practices transform experimental models into scalable solutions.
+
+## Available Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Credit Score AI Engine" icon="credit-card" href="/use-cases/credit-score-ai">
+    End-to-end credit risk assessment using deep learning with PyTorch, FastAPI deployment, and MLflow tracking
+  </Card>
+  
+  <Card title="Energy Imports Forecasting" icon="bolt" color="#f59e0b">
+    Time series analysis and prediction of energy import patterns (Coming Soon)
+  </Card>
+  
+  <Card title="Retail Sales Optimization" icon="cart-shopping" color="#8b5cf6">
+    Sales forecasting and optimization for retail environments (Coming Soon)
+  </Card>
+  
+  <Card title="X-ray Diagnosis" icon="x-ray" color="#ec4899">
+    Medical image classification using deep learning for diagnostic support (Coming Soon)
+  </Card>
+</CardGroup>
+
+## Industry Applications
+
+Our use cases span multiple industries, demonstrating the versatility of modern data science engineering:
+
+### Financial Services
+
+The **Credit Score AI Engine** showcases how machine learning can revolutionize credit risk assessment in:
+
+- **Neobanks & Fintechs**: Real-time decision engines for virtual credit card approvals in milliseconds
+- **E-commerce (Buy Now, Pay Later)**: Native payment gateway integration for instant financing
+- **Microfinance & Financial Inclusion**: Alternative scoring models for unbanked populations
+- **Insurance Technology**: Dynamic premium adjustment based on financial risk profiles
+
+### Energy & Utilities
+
+The **Energy Imports** project demonstrates forecasting capabilities for:
+
+- Demand prediction and capacity planning
+- Supply chain optimization
+- Cost forecasting and budget allocation
+- Policy impact analysis
+
+### Retail & Commerce
+
+The **Retail Sales** use case focuses on:
+
+- Inventory optimization
+- Demand forecasting
+- Revenue prediction
+- Promotional campaign effectiveness
+
+### Healthcare
+
+The **X-ray Diagnosis** project explores:
+
+- Automated image classification
+- Diagnostic support systems
+- Pattern recognition in medical imaging
+- Clinical decision support
+
+## Architecture Philosophy
+
+<Note>
+All use cases follow the same production-grade architecture principles:
+- **Reproducibility**: Deterministic environments with UV and Docker
+- **Observability**: MLflow integration for experiment tracking
+- **Scalability**: Containerized microservices architecture
+- **Maintainability**: Modular design with clear separation of concerns
+</Note>
+
+Each use case demonstrates:
+
+1. **Data Management**: Version-controlled datasets using DVC
+2. **Model Development**: Structured training pipelines with configuration management
+3. **API Development**: High-performance REST APIs with FastAPI
+4. **Deployment**: Docker-based containerization for consistent environments
+5. **Monitoring**: Comprehensive logging and experiment tracking
+
+## Technical Stack
+
+Our use cases leverage industry-standard tools and frameworks:
+
+<CardGroup cols={3}>
+  <Card title="Python 3.10+" icon="python">
+    Core programming language
+  </Card>
+  <Card title="PyTorch" icon="fire">
+    Deep learning framework
+  </Card>
+  <Card title="FastAPI" icon="rocket">
+    High-performance API framework
+  </Card>
+  <Card title="Docker" icon="docker">
+    Containerization platform
+  </Card>
+  <Card title="MLflow" icon="chart-line">
+    MLOps experiment tracking
+  </Card>
+  <Card title="DVC" icon="database">
+    Data version control
+  </Card>
+</CardGroup>
+
+## From Notebook to Production
+
+Each use case follows a structured development lifecycle:
+
+<Steps>
+  <Step title="Exploratory Analysis">
+    Initial data exploration and prototype development in Jupyter notebooks, stored in `notebooks-analysis/`
+  </Step>
+  
+  <Step title="Model Development">
+    Structured implementation with proper software engineering practices in `python-projects/`
+  </Step>
+  
+  <Step title="API Development">
+    FastAPI-based REST APIs with Pydantic validation and automatic documentation
+  </Step>
+  
+  <Step title="Containerization">
+    Docker images built with optimized configurations for production deployment
+  </Step>
+  
+  <Step title="Deployment & Monitoring">
+    Docker Compose orchestration with integrated logging and experiment tracking
+  </Step>
+</Steps>
+
+## Key Differentiators
+
+What sets these use cases apart from typical data science projects:
+
+- **Production-Ready Code**: Not just notebooks—fully structured, tested, and documented applications
+- **MLOps Integration**: Complete experiment tracking and model versioning from day one
+- **DevOps Best Practices**: CI/CD pipelines, containerization, and infrastructure as code
+- **Modular Architecture**: Clear separation between data processing, model training, inference, and API layers
+- **Type Safety**: Pydantic schemas ensure data validation at runtime
+- **Reproducibility**: Locked dependencies and version-controlled data guarantee consistent results
+
+## Getting Started
+
+Explore the detailed documentation for each use case to understand:
+
+- Project architecture and design decisions
+- Technical implementation details
+- Deployment instructions
+- API specifications
+- Performance considerations
+
+<Card title="Start with Credit Score AI" icon="arrow-right" href="/use-cases/credit-score-ai">
+  Dive into our most complete use case with full implementation details
+</Card>

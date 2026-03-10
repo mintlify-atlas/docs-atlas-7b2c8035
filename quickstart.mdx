@@ -1,80 +1,467 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: 'Quickstart'
+description: 'Get started with the Credit Score AI Engine in under 10 minutes'
+icon: 'rocket'
 ---
 
-## Get started in three steps
+## Overview
 
-Get your documentation site running locally and make your first customization.
+This quickstart guide will help you set up the Credit Score AI Engine, train your first deep learning model for credit risk prediction, and deploy it as a production-ready API.
 
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+The Credit Score AI Engine is built with PyTorch and demonstrates MLOps best practices for the complete AI lifecycle: from data preprocessing to model deployment.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  **What you'll build:** A credit risk prediction system that evaluates loan applicants and returns risk scores (good/bad) with confidence probabilities.
+</Note>
+
+## Prerequisites
+
+Before you begin, ensure you have:
+
+- **Python 3.10+** installed
+- **Git** for version control
+- **UV package manager** (recommended) or pip
+- **Docker** (optional, for containerized deployment)
+
+## Installation
+
+<Steps>
+  <Step title="Clone the repository">
+    First, clone the data science services repository:
+
+    ```bash
+    git clone <repository-url>
+    cd data_science_services/python-projects/credit-score
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    Using UV (recommended for faster installation):
+
+    ```bash
+    uv sync
+    ```
+
+    Or using pip:
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+    <Note>
+      The project uses modern Python packaging with `pyproject.toml` and `uv.lock` for deterministic builds.
+    </Note>
+
+    **Key dependencies installed:**
+    - `torch==2.10.0` - Deep learning framework
+    - `fastapi==0.128.0` - High-performance API framework
+    - `scikit-learn==1.7.2` - Data preprocessing
+    - `pydantic==2.12.5` - Data validation
+    - `mlflow` - Experiment tracking
+  </Step>
+
+  <Step title="Start MLflow tracking server">
+    Launch MLflow UI to monitor training metrics in real-time:
+
+    ```bash
+    uv run mlflow ui
+    ```
+
+    Access the dashboard at: `http://127.0.0.1:5000`
+
+    <img src="/images/mlflow-dashboard.png" alt="MLflow Dashboard" />
+  </Step>
+</Steps>
+
+## Environment Setup
+
+### Project Structure
+
+Understand the key directories:
+
+```text
+credit-score/
+├── config/
+│   └── models-configs/          # Model hyperparameters (YAML)
+├── model/
+│   └── model.py                 # PyTorch neural network architecture
+├── processing/
+│   └── preprocessor.py          # Data transformation pipeline
+├── training/
+│   └── training.py              # Training orchestration
+├── inference/
+│   └── inference.py             # Inference engine (singleton)
+├── server/
+│   ├── api.py                   # FastAPI REST endpoints
+│   └── schemas.py               # Pydantic data contracts
+└── examples/
+    └── client_web/              # Demo web interface
+```
+
+### Configuration Files
+
+Model configurations are defined in YAML for experiment flexibility:
+
+```yaml config/models-configs/model_config_001.yaml
+hyperparameters:
+  learning_rate: 0.001
+  batch_size: 64
+  epochs: 20
+  dropout_rate: 0.2
+  hidden_layers: [128, 64, 32]
+  activation_functions: ["relu", "relu", "relu"]
+```
+
+<Warning>
+  Never hardcode hyperparameters in training code. Always use configuration files for reproducibility.
+</Warning>
+
+## Training Your First Model
+
+<Steps>
+  <Step title="Prepare the dataset">
+    The German Credit Risk dataset is managed with DVC (Data Version Control):
+
+    ```bash
+    # Navigate to datasets directory
+    cd ../../../datasets/credit_score_dataset/
+
+    # Pull the latest dataset version
+    dvc pull german_credit_risk_v1.0.0_training_23012026.csv.dvc
+    ```
+
+    The dataset includes features like:
+    - Age, Sex, Job level
+    - Housing status
+    - Saving/Checking accounts
+    - Credit amount and duration
+    - Loan purpose
+  </Step>
+
+  <Step title="Run the training pipeline">
+    Navigate back to the project and execute training:
+
+    ```bash
+    cd ../python-projects/credit-score/
+    uv run training/training.py --config config/models-configs/model_config_001.yaml
+    ```
+
+    **What happens during training:**
+
+    <CodeGroup>
+    ```python training/training.py (excerpt)
+    # Load and preprocess data
+    df = load_data(dataset_path)
+    X_train, X_test, y_train, y_test = preprocess_data(df, save_path=preprocessor_path)
+
+    # Convert to PyTorch tensors
+    X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
+    y_train_tensor = torch.tensor(y_train.values, dtype=torch.float32).unsqueeze(1)
+
+    # Initialize model
+    model = CreditScoreModel(model_config)
+
+    # Training loop
+    criterion = nn.BCEWithLogitsLoss()
+    optimizer = optim.AdamW(model.parameters(), lr=config["learning_rate"])
+
+    for epoch in range(epochs):
+        model.train()
+        for inputs, labels in train_loader:
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Monitor training progress">
+    Watch metrics in real-time via MLflow UI:
+
+    - **Train Loss & Accuracy** - Per epoch
+    - **Test Metrics** - ROC AUC, Precision, Recall, F1
+    - **Visualizations** - Confusion matrix, ROC curve, Precision-Recall curve
+
+    All artifacts are automatically logged:
+
+    ```python
+    mlflow.log_metric("train_loss", epoch_loss, step=epoch)
+    mlflow.log_metric("test_roc_auc", roc_auc)
+    mlflow.log_figure(plt.gcf(), "confusion_matrix.png")
+    mlflow.log_artifact(model_save_path)
+    ```
+  </Step>
+
+  <Step title="Verify model artifacts">
+    After training completes, verify saved artifacts:
+
+    ```bash
+    # Model weights
+    ls model/model_weights_001.pth
+
+    # Preprocessor (for inference)
+    ls processing/preprocessor.joblib
+
+    # MLflow experiments
+    ls mlruns/
+    ```
+  </Step>
+</Steps>
+
+## Running Inference
+
+### Start the API Server
+
+Launch the FastAPI inference server:
+
+```bash
+uv run uvicorn server.api:app --reload --port 8000
+```
+
+<Note>
+  The API automatically loads the trained model using a **singleton pattern** for optimal performance.
+</Note>
+
+### API Documentation
+
+Access interactive Swagger docs at: `http://localhost:8000/docs`
+
+### Make Predictions
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST "http://localhost:8000/credit_score_prediction" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "Age": 35,
+    "Sex": "male",
+    "Job": "skilled",
+    "Housing": "own",
+    "Saving accounts": "NA",
+    "Checking account": "little",
+    "Credit amount": 9055.0,
+    "Duration": 36,
+    "Purpose": "education"
+  }'
+```
+
+```python Python
+import requests
+
+url = "http://localhost:8000/credit_score_prediction"
+
+data = {
+    "Age": 35,
+    "Sex": "male",
+    "Job": "skilled",
+    "Housing": "own",
+    "Saving accounts": "NA",
+    "Checking account": "little",
+    "Credit amount": 9055.0,
+    "Duration": 36,
+    "Purpose": "education"
+}
+
+response = requests.post(url, json=data)
+result = response.json()
+
+print(f"Prediction: {result['prediction']}")
+print(f"Probability: {result['probability']:.2%}")
+```
+
+```javascript JavaScript
+const response = await fetch('http://localhost:8000/credit_score_prediction', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    Age: 35,
+    Sex: 'male',
+    Job: 'skilled',
+    Housing: 'own',
+    'Saving accounts': 'NA',
+    'Checking account': 'little',
+    'Credit amount': 9055.0,
+    Duration: 36,
+    Purpose: 'education'
+  })
+});
+
+const result = await response.json();
+console.log(`Prediction: ${result.prediction}`);
+console.log(`Probability: ${(result.probability * 100).toFixed(2)}%`);
+```
+
+</CodeGroup>
+
+### API Response
+
+```json
+{
+  "prediction": "good",
+  "probability": 0.8523
+}
+```
+
+**Response fields:**
+- `prediction`: Credit risk assessment (`"good"` or `"bad"`)
+- `probability`: Confidence score for "good" risk (0.0 to 1.0)
+
+## Web Interface Demo
+
+Launch the interactive web client for testing:
+
+```bash
+uv run uvicorn examples.client_web.main:app --reload --port 3000
+```
+
+Access at: `http://localhost:3000`
+
+The web interface provides:
+- Form-based input for credit applications
+- Real-time predictions
+- Visual risk indicators
+
+## Docker Deployment (Production)
+
+For production deployment with Docker:
+
+<Steps>
+  <Step title="Build and start services">
+    ```bash
+    docker-compose up --build
+    ```
+
+    This orchestrates:
+    - **API Service** (port 8000)
+    - **Web Client** (port 3000)
+  </Step>
+
+  <Step title="Verify services">
+    ```bash
+    # Check running containers
+    docker-compose ps
+
+    # View API logs
+    docker-compose logs api
+    ```
+  </Step>
+
+  <Step title="Access services">
+    - API: `http://localhost:8000/docs`
+    - Web App: `http://localhost:3000`
+  </Step>
+</Steps>
+
+<Note>
+  Docker images use multi-stage builds for optimized production sizes.
+</Note>
+
+## Model Architecture Overview
+
+The PyTorch model implements a deep neural network:
+
+```python model/model.py (excerpt)
+class CreditScoreModel(nn.Module):
+    def __init__(self, config: ModelConfig):
+        super().__init__()
+        layers = []
+        
+        # Build hidden layers
+        for hidden_dim, act_fn in zip(config.hidden_layers, config.activation_functions):
+            layers.append(nn.Linear(in_dim, hidden_dim))
+            layers.append(nn.BatchNorm1d(hidden_dim))  # Stabilizes training
+            layers.append(get_activation(act_fn))      # ReLU/GELU/etc.
+            layers.append(nn.Dropout(config.dropout_rate))  # Prevents overfitting
+            in_dim = hidden_dim
+        
+        # Output layer
+        layers.append(nn.Linear(in_dim, 1))
+        self.model = nn.Sequential(*layers)
+```
+
+**Key features:**
+- **Batch Normalization** - Accelerates convergence
+- **Dropout Regularization** - Reduces overfitting
+- **Configurable Activations** - ReLU, GELU, LeakyReLU support
+- **He/Xavier Initialization** - Optimal weight initialization per activation type
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Model Configuration" icon="sliders" href="/guides/model-configuration">
+    Learn how to tune hyperparameters and experiment with different architectures
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/inference/overview">
+    Explore all available API endpoints and schemas
+  </Card>
+  <Card title="Production Deployment" icon="rocket" href="/guides/deployment">
+    Deploy to cloud platforms with best practices
+  </Card>
+  <Card title="MLOps Architecture" icon="diagram-project" href="/concepts/mlops-architecture">
+    Understand the MLOps principles and architecture patterns
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="ModuleNotFoundError during training">
+    Ensure you're in the correct directory and all dependencies are installed:
+    
+    ```bash
+    cd python-projects/credit-score/
+    uv sync
+    ```
+  </Accordion>
+
+  <Accordion title="FileNotFoundError: Dataset not found">
+    Pull the dataset using DVC:
+    
+    ```bash
+    cd datasets/credit_score_dataset/
+    dvc pull
+    ```
+  </Accordion>
+
+  <Accordion title="CUDA/GPU not detected">
+    The model runs on CPU by default. For GPU acceleration:
+    
+    ```bash
+    pip install torch --index-url https://download.pytorch.org/whl/cu118
+    ```
+    
+    Then modify `inference/inference.py`:
+    ```python
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    ```
+  </Accordion>
+
+  <Accordion title="API returns 500 error">
+    Check that model artifacts exist:
+    
+    ```bash
+    ls model/model_weights_001.pth
+    ls processing/preprocessor.joblib
+    ```
+    
+    If missing, run training first.
+  </Accordion>
+</AccordionGroup>
+
+## Support
+
+Need help? Check out these resources:
+
+- **Video Tutorial**: [Project Explanation & Demo](https://youtu.be/S5j4cSOEyik)
+- **Deployment Guide**: [Production Deployment Tutorial](https://youtu.be/V2LokJd68bU)
+- **GitHub Issues**: Report bugs or request features
+- **Community**: Join our Discord for discussions
+
+---
+
+<Note>
+  **Congratulations!** You've successfully set up, trained, and deployed a production-ready credit scoring AI system.
 </Note>

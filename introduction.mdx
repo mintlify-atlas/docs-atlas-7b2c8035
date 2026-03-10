@@ -1,0 +1,113 @@
+---
+title: "Introduction"
+description: "Production-ready MLOps platform for building, training, and deploying machine learning models"
+---
+
+<div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm p-8 mb-8">
+  <h1 className="text-5xl font-bold mb-4" style={{ color: "#1a1a1a" }}>
+    AI Data Science Service
+  </h1>
+  <p className="text-xl mb-6" style={{ color: "#545454" }}>
+    A complete MLOps platform demonstrating industry best practices for data science and machine learning engineering.
+  </p>
+  <div className="flex gap-4">
+    <a 
+      href="/quickstart" 
+      className="inline-block px-6 py-3 rounded-md font-semibold text-sm"
+      style={{ backgroundColor: "#94cb04", color: "#1a1a1a" }}
+    >
+      Get Started
+    </a>
+    <a 
+      href="https://github.com/JeffreyPuche/ai-datascience-service" 
+      className="inline-block px-6 py-3 rounded-md font-semibold text-sm border"
+      style={{ borderColor: "#e6e6e6", color: "#1a1a1a" }}
+    >
+      View on GitHub
+    </a>
+  </div>
+</div>
+
+## Overview
+
+AI Data Science Service is a reference implementation for **MLOps and DevOps best practices** in machine learning projects. This repository demonstrates the complete lifecycle of ML engineering—from exploratory analysis to production-ready API services.
+
+The platform bridges the gap between data science notebooks and production software, showcasing how to structure ML projects for scalability, reproducibility, and maintainability.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="PyTorch Deep Learning" icon="brain">
+    Production-grade neural network models built with PyTorch for credit risk prediction
+  </Card>
+  <Card title="MLflow Tracking" icon="chart-line">
+    Complete experiment tracking with model versioning and metrics visualization
+  </Card>
+  <Card title="FastAPI Inference" icon="bolt">
+    High-performance REST API for real-time model inference with automatic documentation
+  </Card>
+  <Card title="DVC Data Versioning" icon="database">
+    Version control for datasets with remote storage integration (S3, DagsHub, Azure Blob)
+  </Card>
+  <Card title="Docker Deployment" icon="docker">
+    Containerized services ensuring consistency from development to production
+  </Card>
+  <Card title="Modular Architecture" icon="cubes">
+    Separation of concerns with distinct modules for training, inference, and preprocessing
+  </Card>
+  <Card title="YAML Configuration" icon="gear">
+    Flexible model configuration system enabling hyperparameter experimentation without code changes
+  </Card>
+  <Card title="Type-Safe Schemas" icon="shield-check">
+    Pydantic validation for robust data contracts and API safety
+  </Card>
+</CardGroup>
+
+## Architecture Highlights
+
+The platform demonstrates professional ML engineering practices:
+
+- **Reproducibility**: Deterministic environments with UV package management and DVC data versioning
+- **Observability**: Deep MLflow integration for tracking experiments, parameters, and artifacts
+- **Scalability**: Async FastAPI services with Docker Compose orchestration
+- **Maintainability**: Modular codebase with clear separation between training and inference
+- **Testing**: Structured for CI/CD integration with GitHub Actions
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Credit Score AI" icon="credit-card" href="/use-cases/credit-score-ai">
+    End-to-end credit risk assessment with PyTorch neural networks
+  </Card>
+  <Card title="More Use Cases" icon="grid" href="/use-cases/overview">
+    Explore upcoming ML projects in energy, retail, and medical imaging
+  </Card>
+</CardGroup>
+
+## What's Inside
+
+This platform includes:
+
+- **Training Pipeline**: Configurable model training with MLflow experiment tracking
+- **Inference API**: FastAPI service exposing trained models via REST endpoints
+- **Data Processing**: Scikit-learn preprocessing pipelines with joblib serialization
+- **Model Architecture**: Flexible PyTorch neural networks with configurable layers and activations
+- **Web Client**: Demo application showcasing API integration
+- **Container Images**: Production-ready Docker configurations
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get up and running in minutes with our quickstart guide
+  </Card>
+  <Card title="MLOps Architecture" icon="diagram-project" href="/concepts/mlops-architecture">
+    Understand the MLOps principles and architecture patterns
+  </Card>
+  <Card title="Training Models" icon="graduation-cap" href="/guides/training-models">
+    Learn how to train and track ML models
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/inference/overview">
+    Explore the complete API documentation
+  </Card>
+</CardGroup>

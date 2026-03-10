@@ -1,0 +1,311 @@
+---
+title: 'Training Pipeline'
+description: 'Complete training pipeline orchestration for credit score models'
+---
+
+## Overview
+
+The training pipeline orchestrates the end-to-end model training process, including data loading, preprocessing, model initialization, training loop execution, evaluation, and artifact logging with MLflow.
+
+## Core Functions
+
+### train()
+
+Main training orchestration function that coordinates the entire training workflow.
+
+<ParamField path="args" type="argparse.Namespace" required>
+  Parsed command-line arguments containing:
+  - `config`: Path to YAML configuration file
+</ParamField>
+
+**Location:** `training/training.py:51`
+
+#### Workflow Steps
+
+1. **Configuration Loading**
+   - Loads YAML configuration using `load_config()`
+   - Extracts configuration name from file path
+   - Sets up MLflow experiment tracking
+
+2. **Data Pipeline**
+   - Loads training dataset from CSV
+   - Applies preprocessing transformations
+   - Saves preprocessor for inference
+   - Splits into train/test sets
+   - Converts to PyTorch tensors
+
+3. **Model Initialization**
+   - Creates `ModelConfig` from YAML parameters
+   - Initializes `CreditScoreModel` with configuration
+   - Sets up BCEWithLogitsLoss criterion
+   - Configures AdamW optimizer
+
+4. **Training Loop**
+   - Iterates for specified epochs
+   - Processes data in batches via DataLoader
+   - Performs forward pass, loss calculation, backward pass
+   - Updates model weights with optimizer
+   - Logs metrics to MLflow at each epoch
+
+5. **Evaluation & Artifacts**
+   - Generates predictions on test set
+   - Computes evaluation metrics
+   - Creates visualization artifacts
+   - Saves model weights
+   - Logs all artifacts to MLflow
+
+<CodeGroup>
+```python Example Usage
+import argparse
+from training.training import train
+
+# Create arguments
+args = argparse.Namespace(
+    config='config/models-configs/model_config_001.yaml'
+)
+
+# Run training
+train(args)
+```
+
+```bash CLI Usage
+# Train with configuration file
+uv run training/training.py --config config/models-configs/model_config_001.yaml
+```
+</CodeGroup>
+
+---
+
+### load_config()
+
+Loads and parses YAML configuration files for training experiments.
+
+<ParamField path="config_path" type="str" required>
+  Absolute or relative path to YAML configuration file
+</ParamField>
+
+**Returns:** `dict` - Parsed configuration dictionary
+
+**Location:** `training/training.py:40`
+
+<CodeGroup>
+```python Usage
+config = load_config('config/models-configs/model_config_001.yaml')
+
+print(config['hidden_layers'])  # [128, 64, 32]
+print(config['learning_rate'])   # 0.0005
+```
+</CodeGroup>
+
+<Note>
+  Configuration files must be valid YAML format. Invalid files will raise parsing exceptions.
+</Note>
+
+---
+
+## Training Loop Details
+
+### Epoch Iteration
+
+The training loop runs for the number of epochs specified in configuration:
+
+<CodeGroup>
+```python Training Loop Structure
+for epoch in range(epochs):
+    model.train()  # Set to training mode
+    running_loss = 0.0
+    correct = 0
+    total = 0
+    
+    for inputs, labels in train_loader:
+        optimizer.zero_grad()        # Reset gradients
+        outputs = model(inputs)       # Forward pass
+        loss = criterion(outputs, labels)  # Compute loss
+        loss.backward()               # Backward pass
+        optimizer.step()              # Update weights
+        
+        # Track metrics
+        running_loss += loss.item()
+        predicted = (torch.sigmoid(outputs) > 0.5).float()
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+```
+</CodeGroup>
+
+**Logged Metrics Per Epoch:**
+- `train_loss`: Average loss across all batches
+- `train_accuracy`: Proportion of correct predictions
+
+---
+
+## Evaluation Metrics
+
+After training completes, the model is evaluated on the test set with the following metrics:
+
+<ResponseField name="test_accuracy" type="float">
+  Overall classification accuracy
+</ResponseField>
+
+<ResponseField name="test_roc_auc" type="float">
+  Area Under the ROC Curve - measures discriminative ability
+</ResponseField>
+
+<ResponseField name="test_precision" type="float">
+  Proportion of positive predictions that are correct
+</ResponseField>
+
+<ResponseField name="test_recall" type="float">
+  Proportion of actual positives correctly identified
+</ResponseField>
+
+<ResponseField name="test_f1_score" type="float">
+  Harmonic mean of precision and recall
+</ResponseField>
+
+### Evaluation Process
+
+<CodeGroup>
+```python Evaluation Code
+model.eval()  # Set to evaluation mode
+with torch.no_grad():  # Disable gradient computation
+    outputs = model(X_test_tensor)
+    probs = torch.sigmoid(outputs).numpy()
+    preds = (probs > 0.5).astype(int)
+    y_true = y_test_tensor.numpy()
+    
+    # Compute metrics
+    acc = accuracy_score(y_true, preds)
+    roc_auc = roc_auc_score(y_true, probs)
+    precision = precision_score(y_true, preds)
+    recall = recall_score(y_true, preds)
+    f1 = f1_score(y_true, preds)
+```
+</CodeGroup>
+
+---
+
+## Artifacts Generated
+
+The training pipeline generates and logs the following artifacts to MLflow:
+
+### Visualizations
+
+1. **Confusion Matrix** (`confusion_matrix.png`)
+   - Heatmap showing true vs predicted labels
+   - Annotated with counts
+
+2. **ROC Curve** (`roc_curve.png`)
+   - True Positive Rate vs False Positive Rate
+   - Includes AUC score in legend
+
+3. **Precision-Recall Curve** (`precision_recall_curve.png`)
+   - Trade-off between precision and recall
+
+### Reports
+
+1. **Classification Report** (`classification_report.txt`)
+   - Per-class precision, recall, F1-score
+   - Support counts for each class
+
+### Model Files
+
+1. **Model Weights** (`model_weights_001.pth`)
+   - PyTorch state dictionary
+   - Saved to `model/` directory
+   - Name derived from configuration file
+
+2. **Preprocessor** (`preprocessor.joblib`)
+   - Fitted preprocessing pipeline
+   - Saved to `processing/` directory
+   - Required for inference
+
+<Note>
+  All artifacts are automatically logged to the active MLflow run and can be retrieved for model deployment.
+</Note>
+
+---
+
+## MLflow Integration
+
+The pipeline uses MLflow for comprehensive experiment tracking:
+
+### Experiment Setup
+
+<CodeGroup>
+```python MLflow Configuration
+mlflow.set_experiment("Credit Score Training")
+
+with mlflow.start_run(run_name=config_name):
+    # Log all parameters
+    mlflow.log_params(config)
+    mlflow.log_param("config_file", config_name)
+    
+    # Training process...
+    
+    # Log metrics
+    mlflow.log_metric("train_loss", epoch_loss, step=epoch)
+    mlflow.log_metric("test_accuracy", acc)
+    
+    # Log artifacts
+    mlflow.log_figure(plt.gcf(), "confusion_matrix.png")
+    mlflow.log_artifact(model_save_path)
+```
+</CodeGroup>
+
+### Tracked Parameters
+
+All configuration parameters are logged:
+- `hidden_layers`
+- `activation_functions`
+- `dropout_rate`
+- `learning_rate`
+- `epochs`
+- `batch_size`
+- `config_file`
+
+---
+
+## Dependencies
+
+### Required Imports
+
+```python
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
+import mlflow
+import mlflow.pytorch
+from sklearn.metrics import (
+    accuracy_score,
+    roc_auc_score,
+    confusion_matrix,
+    classification_report,
+    roc_curve,
+    precision_recall_curve,
+    f1_score,
+    precision_score,
+    recall_score,
+)
+```
+
+### Internal Modules
+
+- `config.logs_configs.logging_config`: Logging setup
+- `model.model`: CreditScoreModel and ModelConfig
+- `processing.preprocessor`: Data loading and preprocessing
+
+---
+
+## Error Handling
+
+<Note>
+  The training pipeline logs all steps using the configured logger. Check logs for detailed error messages if training fails.
+</Note>
+
+Common failure points:
+- Invalid configuration file path
+- Missing dataset file
+- Insufficient memory for batch size
+- MLflow connection errors
+- Invalid model configuration parameters

@@ -1,0 +1,308 @@
+---
+title: 'Training Models'
+description: 'Complete guide to training credit score prediction models with MLflow tracking'
+icon: 'brain'
+---
+
+This guide walks you through the complete process of training a credit score prediction model using PyTorch and MLflow for experiment tracking.
+
+## Prerequisites
+
+Before training models, ensure you have:
+
+- Python 3.10+ installed
+- UV package manager (recommended) or pip
+- MLflow running for experiment tracking
+- Access to the training dataset
+
+## Setup Environment
+
+<Steps>
+  <Step title="Install Dependencies">
+    Install all required packages using UV or pip:
+
+    <CodeGroup>
+    ```bash UV (Recommended)
+    uv sync
+    ```
+
+    ```bash pip
+    pip install -r requirements.txt
+    ```
+    </CodeGroup>
+
+    <Note>
+    UV provides faster, deterministic installations compared to traditional pip.
+    </Note>
+  </Step>
+
+  <Step title="Start MLflow UI">
+    Launch the MLflow tracking server to monitor training in real-time:
+
+    ```bash
+    uv run mlflow ui
+    ```
+
+    Access the dashboard at `http://127.0.0.1:5000` to view:
+    - Training metrics (loss, accuracy)
+    - Model parameters and configurations
+    - Saved artifacts and visualizations
+
+    <Tip>
+    Keep the MLflow UI running in a separate terminal window during training.
+    </Tip>
+  </Step>
+</Steps>
+
+## Training Process
+
+### Basic Training Command
+
+The training script uses YAML configuration files to define model architecture and hyperparameters:
+
+```bash
+uv run training/training.py --config config/models-configs/model_config_001.yaml
+```
+
+<Note>
+See the [Model Configuration](/guides/model-configuration) guide for details on creating custom configurations.
+</Note>
+
+### Training Script Workflow
+
+The training process (`training/training.py:51-237`) follows these steps:
+
+<Steps>
+  <Step title="Load Configuration">
+    The script reads hyperparameters from the specified YAML file:
+
+    ```python
+    config = load_config(config_path)
+    config_name = os.path.splitext(os.path.basename(config_path))[0]
+    ```
+
+    Reference: `training/training.py:40-48`
+  </Step>
+
+  <Step title="Initialize MLflow Experiment">
+    All training runs are tracked under the "Credit Score Training" experiment:
+
+    ```python
+    mlflow.set_experiment("Credit Score Training")
+
+    with mlflow.start_run(run_name=config_name):
+        mlflow.log_params(config)
+        mlflow.log_param("config_file", config_name)
+    ```
+
+    Reference: `training/training.py:65-70`
+  </Step>
+
+  <Step title="Load and Preprocess Data">
+    The training data is loaded and preprocessed automatically:
+
+    ```python
+    df = load_data(dataset_path)
+    X_train, X_test, y_train, y_test = preprocess_data(
+        df, save_path=preprocessor_path
+    )
+    ```
+
+    The preprocessor is saved to `processing/preprocessor.joblib` for use during inference.
+
+    Reference: `training/training.py:85-93`
+  </Step>
+
+  <Step title="Create PyTorch DataLoaders">
+    Data is converted to PyTorch tensors and loaded in batches:
+
+    ```python
+    X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
+    y_train_tensor = torch.tensor(y_train.values, dtype=torch.float32).unsqueeze(1)
+
+    train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    ```
+
+    Reference: `training/training.py:96-104`
+  </Step>
+
+  <Step title="Initialize Model">
+    The neural network is built based on configuration parameters:
+
+    ```python
+    model_config = ModelConfig(
+        input_size=input_size,
+        output_size=1,
+        hidden_layers=config["hidden_layers"],
+        activation_functions=config["activation_functions"],
+        dropout_rate=config["dropout_rate"],
+        learning_rate=config["learning_rate"],
+        epochs=config["epochs"],
+        batch_size=batch_size,
+    )
+
+    model = CreditScoreModel(model_config)
+    ```
+
+    Reference: `training/training.py:107-119`
+  </Step>
+
+  <Step title="Training Loop">
+    The model is trained using Binary Cross-Entropy Loss and AdamW optimizer:
+
+    ```python
+    criterion = nn.BCEWithLogitsLoss()
+    optimizer = optim.AdamW(model.parameters(), lr=config["learning_rate"])
+
+    for epoch in range(epochs):
+        model.train()
+        for inputs, labels in train_loader:
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+    ```
+
+    Metrics are logged to MLflow at each epoch:
+
+    ```python
+    mlflow.log_metric("train_loss", epoch_loss, step=epoch)
+    mlflow.log_metric("train_accuracy", epoch_acc, step=epoch)
+    ```
+
+    Reference: `training/training.py:122-158`
+  </Step>
+
+  <Step title="Evaluation">
+    The model is evaluated on the test set:
+
+    ```python
+    model.eval()
+    with torch.no_grad():
+        outputs = model(X_test_tensor)
+        probs = torch.sigmoid(outputs).numpy()
+        preds = (probs > 0.5).astype(int)
+    ```
+
+    Multiple metrics are computed and logged:
+
+    - **Accuracy**: Overall classification accuracy
+    - **ROC AUC**: Area under the ROC curve
+    - **Precision**: Positive predictive value
+    - **Recall**: Sensitivity
+    - **F1 Score**: Harmonic mean of precision and recall
+
+    Reference: `training/training.py:161-183`
+  </Step>
+
+  <Step title="Save Artifacts">
+    The trained model weights are saved:
+
+    ```python
+    model_save_path = os.path.join(save_dir, f"{weights_name}.pth")
+    torch.save(model.state_dict(), model_save_path)
+    mlflow.log_artifact(model_save_path)
+    ```
+
+    Visualizations are also generated and logged:
+    - Confusion Matrix
+    - ROC Curve
+    - Precision-Recall Curve
+    - Classification Report
+
+    Reference: `training/training.py:228-236`
+  </Step>
+</Steps>
+
+## Training Multiple Configurations
+
+You can train multiple models with different hyperparameters in parallel or sequentially:
+
+<CodeGroup>
+```bash Sequential Training
+# Train with configuration 001
+uv run training/training.py --config config/models-configs/model_config_001.yaml
+
+# Train with configuration 002
+uv run training/training.py --config config/models-configs/model_config_002.yaml
+```
+
+```bash Parallel Training (Advanced)
+# Use shell background processes
+uv run training/training.py --config config/models-configs/model_config_001.yaml &
+uv run training/training.py --config config/models-configs/model_config_002.yaml &
+wait
+```
+</CodeGroup>
+
+<Warning>
+Parallel training requires sufficient RAM and GPU memory. Monitor system resources carefully.
+</Warning>
+
+## Monitoring Training Progress
+
+Once training starts, you can monitor it through MLflow:
+
+1. **Navigate to** `http://127.0.0.1:5000`
+2. **Select** the "Credit Score Training" experiment
+3. **View** real-time metrics:
+   - Training loss curve
+   - Training accuracy progression
+   - Test metrics upon completion
+4. **Compare** different runs side-by-side
+5. **Download** artifacts (model weights, visualizations)
+
+## Understanding Training Output
+
+During training, you'll see console output like:
+
+```
+Epoch [1/150], Loss: 0.6234, Accuracy: 0.7123
+Epoch [2/150], Loss: 0.5891, Accuracy: 0.7345
+Epoch [3/150], Loss: 0.5567, Accuracy: 0.7501
+...
+Test Accuracy: 0.8234
+Test ROC AUC: 0.8756
+Model weights saved to model/model_weights_001.pth
+```
+
+## Troubleshooting
+
+<Accordion title="Training loss is not decreasing">
+  - **Check learning rate**: Try reducing it (e.g., from 0.001 to 0.0001)
+  - **Verify data preprocessing**: Ensure features are properly normalized
+  - **Increase model capacity**: Add more hidden layers or neurons
+  - **Check for NaN values**: Look at MLflow metrics for anomalies
+</Accordion>
+
+<Accordion title="Model overfits training data">
+  - **Increase dropout rate**: Try 0.4 or 0.5 instead of 0.3
+  - **Add regularization**: Consider L2 regularization in optimizer
+  - **Reduce model complexity**: Use fewer layers or neurons
+  - **Get more training data**: If possible, expand the dataset
+</Accordion>
+
+<Accordion title="MLflow connection errors">
+  - **Verify MLflow is running**: Check `http://127.0.0.1:5000`
+  - **Check port availability**: Ensure port 5000 is not in use
+  - **Restart MLflow**: Stop and restart the MLflow UI
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Model Configuration" icon="sliders" href="/guides/model-configuration">
+    Learn how to customize model architecture and hyperparameters
+  </Card>
+  <Card title="Running Inference" icon="play" href="/guides/running-inference">
+    Use your trained model to make predictions
+  </Card>
+  <Card title="MLflow Tracking" icon="chart-line" href="/guides/mlflow-tracking">
+    Deep dive into experiment tracking and visualization
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/guides/deployment">
+    Deploy your model to production with Docker
+  </Card>
+</CardGroup>

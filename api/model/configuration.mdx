@@ -1,0 +1,268 @@
+---
+title: "Model Configuration"
+description: "Configuration dataclass and activation function factory for CreditScoreModel"
+---
+
+## Overview
+
+This module provides the configuration infrastructure for the Credit Score Model, including the `ModelConfig` dataclass for defining model architecture and hyperparameters, and the `get_activation()` factory function for creating activation layers.
+
+## ModelConfig
+
+Dataclass that encapsulates all model architecture and training parameters.
+
+```python
+@dataclass
+class ModelConfig:
+    input_size: int
+    hidden_layers: list[int]
+    activation_functions: list[Literal["relu", "leaky_relu", "gelu", "sigmoid", "softmax", "tanh"]]
+    output_size: int = 1
+    dropout_rate: float = 0.2
+    learning_rate: float = 0.001
+    epochs: int = 100
+    batch_size: int = 32
+    checkpoint_path: str = "./model/checkpoint"
+```
+
+### Parameters
+
+#### Required Parameters
+
+<ParamField path="input_size" type="int" required>
+  Number of input features. Must match the dimensionality of preprocessed input data.
+  
+  Example: For a dataset with 20 features after preprocessing, set `input_size=20`
+</ParamField>
+
+<ParamField path="hidden_layers" type="list[int]" required>
+  List of integers defining the number of neurons in each hidden layer.
+  
+  **Important**: Length must match the length of `activation_functions`.
+  
+  Example: `[128, 64, 32]` creates a 3-layer architecture with decreasing width
+</ParamField>
+
+<ParamField path="activation_functions" type="list[str]" required>
+  List of activation function names, one per hidden layer. Supported values:
+  - `"relu"`: Rectified Linear Unit
+  - `"leaky_relu"`: Leaky ReLU (negative_slope=0.1)
+  - `"gelu"`: Gaussian Error Linear Unit
+  - `"sigmoid"`: Sigmoid activation
+  - `"softmax"`: Softmax (dim=1)
+  - `"tanh"`: Hyperbolic tangent
+  
+  **Important**: Length must match the length of `hidden_layers`.
+</ParamField>
+
+#### Optional Parameters
+
+<ParamField path="output_size" type="int" default="1">
+  Number of output neurons. For binary classification, use `1` (outputs logits before sigmoid).
+</ParamField>
+
+<ParamField path="dropout_rate" type="float" default="0.2">
+  Dropout probability applied after each hidden layer activation. Range: [0.0, 1.0]
+  
+  Higher values provide stronger regularization but may underfit.
+</ParamField>
+
+<ParamField path="learning_rate" type="float" default="0.001">
+  Learning rate for the optimizer during training.
+</ParamField>
+
+<ParamField path="epochs" type="int" default="100">
+  Number of training epochs.
+</ParamField>
+
+<ParamField path="batch_size" type="int" default="32">
+  Number of samples per training batch.
+</ParamField>
+
+<ParamField path="checkpoint_path" type="str" default="./model/checkpoint">
+  Directory path for saving model checkpoints during training.
+</ParamField>
+
+### Usage Examples
+
+<CodeGroup>
+```python Basic Configuration
+from model.model import ModelConfig
+
+# Simple 2-layer network
+config = ModelConfig(
+    input_size=20,
+    hidden_layers=[64, 32],
+    activation_functions=["relu", "relu"]
+)
+```
+
+```python Advanced Configuration
+# Deep network with mixed activations and high regularization
+config = ModelConfig(
+    input_size=50,
+    hidden_layers=[256, 128, 64, 32],
+    activation_functions=["gelu", "relu", "relu", "tanh"],
+    output_size=1,
+    dropout_rate=0.4,
+    learning_rate=0.0001,
+    epochs=200,
+    batch_size=128,
+    checkpoint_path="./checkpoints/experiment_01"
+)
+```
+
+```yaml YAML Configuration File
+# config/models-configs/model_config_001.yaml
+hidden_layers:
+  - 128
+  - 64
+  - 32
+activation_functions:
+  - relu
+  - relu
+  - relu
+dropout_rate: 0.3
+learning_rate: 0.0005
+epochs: 150
+batch_size: 64
+```
+
+```python Loading from YAML
+import yaml
+from model.model import ModelConfig
+
+# Load configuration from YAML file
+with open("config/models-configs/model_config_001.yaml", "r") as f:
+    config_dict = yaml.safe_load(f)
+
+# Create ModelConfig with base parameters
+config = ModelConfig(
+    input_size=20,  # Determined from data
+    hidden_layers=config_dict["hidden_layers"],
+    activation_functions=config_dict["activation_functions"],
+    dropout_rate=config_dict["dropout_rate"],
+    learning_rate=config_dict["learning_rate"],
+    epochs=config_dict["epochs"],
+    batch_size=config_dict["batch_size"]
+)
+```
+</CodeGroup>
+
+## get_activation()
+
+Factory function that returns PyTorch activation modules based on string identifiers.
+
+```python
+def get_activation(function_name: str) -> nn.Module
+```
+
+### Parameters
+
+<ParamField path="function_name" type="str" required>
+  Name of the activation function. Must be one of:
+  - `"relu"`: Returns `nn.ReLU()`
+  - `"leaky_relu"`: Returns `nn.LeakyReLU(negative_slope=0.1)`
+  - `"gelu"`: Returns `nn.GELU()`
+  - `"sigmoid"`: Returns `nn.Sigmoid()`
+  - `"softmax"`: Returns `nn.Softmax(dim=1)`
+  - `"tanh"`: Returns `nn.Tanh()`
+</ParamField>
+
+### Returns
+
+<ResponseField name="activation" type="nn.Module">
+  PyTorch activation module instance
+</ResponseField>
+
+### Raises
+
+<ResponseField name="ValueError" type="Exception">
+  Raised when `function_name` is not recognized. Error is also logged via the module logger.
+</ResponseField>
+
+### Usage Example
+
+```python
+import torch.nn as nn
+from model.model import get_activation
+
+# Create activation layers
+relu = get_activation("relu")
+leaky_relu = get_activation("leaky_relu")
+gelu = get_activation("gelu")
+
+# Use in custom model
+class CustomLayer(nn.Module):
+    def __init__(self, in_features, out_features, activation="relu"):
+        super().__init__()
+        self.linear = nn.Linear(in_features, out_features)
+        self.activation = get_activation(activation)
+    
+    def forward(self, x):
+        return self.activation(self.linear(x))
+```
+
+## Activation Function Details
+
+### ReLU (Rectified Linear Unit)
+- **Formula**: `f(x) = max(0, x)`
+- **Best for**: Deep networks, general-purpose hidden layers
+- **Weight initialization**: He/Kaiming
+
+### Leaky ReLU
+- **Formula**: `f(x) = x if x > 0 else 0.1 * x`
+- **Best for**: Networks with dying ReLU problems
+- **Weight initialization**: He/Kaiming
+
+### GELU (Gaussian Error Linear Unit)
+- **Best for**: Transformer-style architectures, smooth gradients
+- **Weight initialization**: He/Kaiming (using ReLU variant)
+
+### Sigmoid
+- **Formula**: `f(x) = 1 / (1 + exp(-x))`
+- **Best for**: Binary classification output, gates in LSTM-style networks
+- **Weight initialization**: Xavier/Glorot
+- **Note**: Susceptible to vanishing gradients in deep networks
+
+### Softmax
+- **Formula**: `f(x_i) = exp(x_i) / sum(exp(x_j))`
+- **Best for**: Multi-class classification output layer
+- **Weight initialization**: Xavier/Glorot
+- **Note**: Applied across dimension 1 (batch dimension)
+
+### Tanh (Hyperbolic Tangent)
+- **Formula**: `f(x) = (exp(x) - exp(-x)) / (exp(x) + exp(-x))`
+- **Best for**: Hidden layers in RNNs, zero-centered outputs
+- **Weight initialization**: Xavier/Glorot
+
+## Configuration Validation
+
+<Note>
+  The `CreditScoreModel` constructor validates that `len(hidden_layers) == len(activation_functions)`. Mismatched lengths will raise a `ValueError` at model initialization.
+</Note>
+
+### Example Error
+
+```python
+# This will raise ValueError
+config = ModelConfig(
+    input_size=20,
+    hidden_layers=[128, 64, 32],
+    activation_functions=["relu", "relu"]  # Only 2 functions for 3 layers!
+)
+model = CreditScoreModel(config)  # ValueError: La longitud de las capas ocultas debe ser igual...
+```
+
+## Best Practices
+
+1. **Start simple**: Begin with 2-3 hidden layers and ReLU activations
+2. **Layer size**: Typically decrease layer sizes progressively (e.g., 128 → 64 → 32)
+3. **Dropout**: Start with 0.2-0.3 for moderate regularization
+4. **Learning rate**: Use 0.001 as baseline, decrease if training is unstable
+5. **Batch size**: Larger batches (64-128) provide more stable gradients
+6. **Activation mixing**: ReLU for most layers, consider Tanh for final hidden layer
+
+## Source Reference
+
+Implementation: `python-projects/credit-score/model/model.py:19-55`

@@ -1,0 +1,300 @@
+---
+title: 'Schemas'
+description: 'Pydantic models and enums for credit risk API validation'
+---
+
+This module defines the input and output schemas for the credit risk prediction API using Pydantic for data validation.
+
+## Input Schemas
+
+### CreditRiskInput
+
+Defines the structure of input data for credit risk prediction. Field names match the original dataset columns.
+
+```python
+class CreditRiskInput(BaseModel)
+```
+
+<ParamField path="Age" type="int" required>
+  Age of the applicant in years. Must be greater than 0.
+</ParamField>
+
+<ParamField path="Sex" type="SexEnum" required>
+  Sex of the applicant. Valid values: `male`, `female`
+</ParamField>
+
+<ParamField path="Job" type="JobEnum" required>
+  Job skill level of the applicant. See [JobEnum](#jobenum) for valid values.
+</ParamField>
+
+<ParamField path="Housing" type="HousingEnum" required>
+  Housing type of the applicant. Valid values: `own`, `rent`, `free`
+</ParamField>
+
+<ParamField path="Saving accounts" type="SavingAccountsEnum" required>
+  Status of the applicant's savings account. See [SavingAccountsEnum](#savingaccountsenum) for valid values.
+</ParamField>
+
+<ParamField path="Checking account" type="CheckingAccountEnum" required>
+  Status of the applicant's checking account. See [CheckingAccountEnum](#checkingaccountenum) for valid values.
+</ParamField>
+
+<ParamField path="Credit amount" type="float" required>
+  Amount of credit requested. Must be greater than 0.
+</ParamField>
+
+<ParamField path="Duration" type="int" required>
+  Duration of the credit in months. Must be greater than 0.
+</ParamField>
+
+<ParamField path="Purpose" type="PurposeEnum" required>
+  Purpose of the credit. See [PurposeEnum](#purposeenum) for valid values.
+</ParamField>
+
+<Note>
+  The schema uses field aliases to support spaces in field names (e.g., "Saving accounts", "Checking account", "Credit amount"). Both the aliased and underscore versions are accepted.
+</Note>
+
+<CodeGroup>
+```json Example Request
+{
+  "Age": 35,
+  "Sex": "male",
+  "Job": "unskilled and resident",
+  "Housing": "free",
+  "Saving accounts": "NA",
+  "Checking account": "NA",
+  "Credit amount": 9055,
+  "Duration": 36,
+  "Purpose": "education"
+}
+```
+
+```python Python Example
+from server.schemas import CreditRiskInput
+
+input_data = CreditRiskInput(
+    Age=35,
+    Sex="male",
+    Job="unskilled and resident",
+    Housing="free",
+    Saving_accounts="NA",  # Can use underscore version
+    Checking_account="NA",
+    Credit_amount=9055,
+    Duration=36,
+    Purpose="education"
+)
+```
+</CodeGroup>
+
+---
+
+## Output Schemas
+
+### CreditRiskOutput
+
+Defines the structure of the API response for credit risk prediction.
+
+```python
+class CreditRiskOutput(BaseModel)
+```
+
+<ResponseField name="prediction" type="str" required>
+  Credit risk prediction: either "good" or "bad"
+</ResponseField>
+
+<ResponseField name="probability" type="float" required>
+  Probability that the risk is "good" (range: 0.0 to 1.0)
+</ResponseField>
+
+<CodeGroup>
+```json Example Response
+{
+  "prediction": "good",
+  "probability": 0.87
+}
+```
+
+```python Python Example
+from server.schemas import CreditRiskOutput
+
+output = CreditRiskOutput(
+    prediction="good",
+    probability=0.87
+)
+```
+</CodeGroup>
+
+---
+
+## Enums
+
+### SexEnum
+
+Defines valid values for the applicant's sex.
+
+```python
+class SexEnum(str, Enum):
+    male = "male"
+    female = "female"
+```
+
+| Value | Description |
+|-------|-------------|
+| `male` | Male applicant |
+| `female` | Female applicant |
+
+---
+
+### JobEnum
+
+Defines valid job skill levels for the applicant.
+
+```python
+class JobEnum(str, Enum):
+    level_0 = "unskilled and non-resident"
+    level_1 = "unskilled and resident"
+    level_2 = "skilled"
+    level_3 = "highly skilled"
+```
+
+| Value | Description |
+|-------|-------------|
+| `unskilled and non-resident` | Level 0 - Unskilled and non-resident |
+| `unskilled and resident` | Level 1 - Unskilled and resident |
+| `skilled` | Level 2 - Skilled worker |
+| `highly skilled` | Level 3 - Highly skilled worker |
+
+<Note>
+  The `Job` field has a custom validator that converts JobEnum values to their numeric level (0-3) when processing.
+</Note>
+
+---
+
+### HousingEnum
+
+Defines valid housing types for the applicant.
+
+```python
+class HousingEnum(str, Enum):
+    own = "own"
+    rent = "rent"
+    free = "free"
+```
+
+| Value | Description |
+|-------|-------------|
+| `own` | Owns housing |
+| `rent` | Rents housing |
+| `free` | Free housing |
+
+---
+
+### SavingAccountsEnum
+
+Defines valid savings account statuses.
+
+```python
+class SavingAccountsEnum(str, Enum):
+    na = "NA"
+    little = "little"
+    moderate = "moderate"
+    quite_rich = "quite rich"
+    rich = "rich"
+```
+
+| Value | Description |
+|-------|-------------|
+| `NA` | No savings account information |
+| `little` | Little savings |
+| `moderate` | Moderate savings |
+| `quite rich` | Quite rich savings |
+| `rich` | Rich savings |
+
+---
+
+### CheckingAccountEnum
+
+Defines valid checking account statuses.
+
+```python
+class CheckingAccountEnum(str, Enum):
+    na = "NA"
+    little = "little"
+    moderate = "moderate"
+    rich = "rich"
+```
+
+| Value | Description |
+|-------|-------------|
+| `NA` | No checking account information |
+| `little` | Little balance |
+| `moderate` | Moderate balance |
+| `rich` | Rich balance |
+
+---
+
+### PurposeEnum
+
+Defines valid purposes for the credit request.
+
+```python
+class PurposeEnum(str, Enum):
+    car = "car"
+    furniture_equipment = "furniture/equipment"
+    radio_tv = "radio/TV"
+    domestic_appliances = "domestic appliances"
+    repairs = "repairs"
+    education = "education"
+    business = "business"
+    vacation_others = "vacation/others"
+```
+
+| Value | Description |
+|-------|-------------|
+| `car` | Purchase a car |
+| `furniture/equipment` | Purchase furniture or equipment |
+| `radio/TV` | Purchase radio or TV |
+| `domestic appliances` | Purchase domestic appliances |
+| `repairs` | Home or property repairs |
+| `education` | Education expenses |
+| `business` | Business purposes |
+| `vacation/others` | Vacation or other purposes |
+
+---
+
+## Validation
+
+All schemas include Pydantic validation:
+
+- **Type validation**: Ensures all fields match their declared types
+- **Range validation**: Age, Credit amount, and Duration must be greater than 0
+- **Enum validation**: Categorical fields must use valid enum values
+- **Probability validation**: Output probability must be between 0.0 and 1.0
+
+<CodeGroup>
+```python Validation Example
+from server.schemas import CreditRiskInput
+from pydantic import ValidationError
+
+try:
+    # This will raise a validation error (Age must be > 0)
+    invalid_input = CreditRiskInput(
+        Age=-5,
+        Sex="male",
+        Job="skilled",
+        Housing="own",
+        Saving_accounts="little",
+        Checking_account="moderate",
+        Credit_amount=5000,
+        Duration=24,
+        Purpose="car"
+    )
+except ValidationError as e:
+    print(e)
+```
+</CodeGroup>
+
+## Source Code Reference
+
+View the complete implementation at `server/schemas.py:1-109`

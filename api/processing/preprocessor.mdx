@@ -1,0 +1,145 @@
+---
+title: 'Preprocessor'
+description: 'Data preprocessing functions for credit risk analysis'
+---
+
+The preprocessor module handles loading and preprocessing credit risk data for model training and inference.
+
+## Functions
+
+### load_data
+
+```python
+def load_data(filepath: str) -> pd.DataFrame
+```
+
+Loads a dataset from the specified file path.
+
+<ParamField path="filepath" type="str" required>
+  Path to the CSV file containing the credit risk dataset
+</ParamField>
+
+<ResponseField name="return" type="pd.DataFrame">
+  DataFrame containing the loaded dataset
+</ResponseField>
+
+<CodeGroup>
+```python Example
+import pandas as pd
+from processing.preprocessor import load_data
+
+# Load the dataset
+df = load_data("datasets/credit_score_dataset/german_credit_risk.csv")
+print(df.head())
+```
+</CodeGroup>
+
+---
+
+### preprocess_data
+
+```python
+def preprocess_data(
+    df: pd.DataFrame,
+    target_column: str = "Risk",
+    save_path: str = None
+)
+```
+
+Preprocesses the credit risk dataset by handling missing values, encoding categorical features, and splitting data into training and test sets.
+
+<ParamField path="df" type="pd.DataFrame" required>
+  Input DataFrame containing the credit risk data
+</ParamField>
+
+<ParamField path="target_column" type="str" default="Risk">
+  Name of the target column. The function expects values "good" (encoded as 1) and "bad" (encoded as 0)
+</ParamField>
+
+<ParamField path="save_path" type="str" optional>
+  Path to save the fitted preprocessor pipeline. If provided, the preprocessor will be saved as a joblib file
+</ParamField>
+
+<ResponseField name="return" type="tuple">
+  Returns a tuple of `(X_train, X_test, y_train, y_test)` containing the preprocessed and split data:
+  
+  - **X_train**: Training features (80% of data)
+  - **X_test**: Test features (20% of data)
+  - **y_train**: Training labels
+  - **y_test**: Test labels
+</ResponseField>
+
+<Note>
+  The function automatically handles:
+  - Removing residual index columns (`Unnamed: 0`)
+  - Encoding target variable: `good` → 1, `bad` → 0
+  - Imputing missing values (mean for numerical, "unknown" for categorical)
+  - Standardizing numerical features
+  - One-hot encoding categorical features
+  - 80/20 train-test split with `random_state=42`
+</Note>
+
+## Preprocessing Pipeline
+
+The preprocessing pipeline applies different transformations to numerical and categorical features:
+
+### Numerical Features
+
+Processed features: `Age`, `Credit amount`, `Duration`
+
+1. **SimpleImputer**: Imputes missing values using the mean
+2. **StandardScaler**: Normalizes features by removing the mean and scaling to unit variance
+
+### Categorical Features
+
+Processed features: `Sex`, `Job`, `Housing`, `Saving accounts`, `Checking account`, `Purpose`
+
+1. **SimpleImputer**: Imputes missing values with "unknown"
+2. **OneHotEncoder**: Converts categorical variables into binary vectors with `handle_unknown="ignore"`
+
+<CodeGroup>
+```python Complete Example
+import pandas as pd
+from processing.preprocessor import load_data, preprocess_data
+
+# Load the dataset
+df = load_data("datasets/credit_score_dataset/german_credit_risk.csv")
+
+# Preprocess and split the data
+X_train, X_test, y_train, y_test = preprocess_data(
+    df,
+    target_column="Risk",
+    save_path="models/preprocessor.joblib"
+)
+
+print(f"Training set size: {X_train.shape}")
+print(f"Test set size: {X_test.shape}")
+```
+
+```python Load Saved Preprocessor
+import joblib
+import pandas as pd
+
+# Load the saved preprocessor
+preprocessor = joblib.load("models/preprocessor.joblib")
+
+# Transform new data
+new_data = pd.DataFrame([{
+    "Age": 35,
+    "Sex": "male",
+    "Job": "skilled",
+    "Housing": "own",
+    "Saving accounts": "little",
+    "Checking account": "moderate",
+    "Credit amount": 5000,
+    "Duration": 24,
+    "Purpose": "car"
+}])
+
+X_processed = preprocessor.transform(new_data)
+```
+</CodeGroup>
+
+## Source Code Reference
+
+View the complete implementation at `processing/preprocessor.py:22-106`

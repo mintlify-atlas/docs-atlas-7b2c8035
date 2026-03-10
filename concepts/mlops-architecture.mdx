@@ -1,0 +1,349 @@
+---
+title: 'MLOps Architecture'
+description: 'Learn how the AI Data Science Service implements MLOps best practices with MLflow, model versioning, and CI/CD integration for reproducible ML workflows'
+icon: 'diagram-project'
+---
+
+## Overview
+
+The AI Data Science Service implements a comprehensive MLOps architecture that ensures reproducibility, traceability, and production-readiness for machine learning models. This architecture bridges the gap between data science experimentation and production deployment.
+
+<Note>
+  **MLOps Philosophy**: "The difference between a notebook and a product is the engineering."
+  
+  This architecture demonstrates how to structure data science projects following industry best practices, breaking the barrier between exploratory analysis and production software.
+</Note>
+
+## Core Components
+
+<CardGroup cols={2}>
+  <Card title="Experiment Tracking" icon="chart-line" href="#experiment-tracking">
+    MLflow for tracking metrics, parameters, and artifacts
+  </Card>
+  <Card title="Model Versioning" icon="code-branch" href="#model-versioning">
+    Systematic versioning of models and configurations
+  </Card>
+  <Card title="CI/CD Integration" icon="rotate" href="#cicd-integration">
+    Automated pipelines for testing and deployment
+  </Card>
+  <Card title="Reproducibility" icon="repeat" href="#reproducibility">
+    Deterministic environments and data versioning
+  </Card>
+</CardGroup>
+
+## Experiment Tracking
+
+### MLflow Integration
+
+The service uses MLflow to track all aspects of model training, enabling complete experiment reproducibility and comparison.
+
+```python training/training.py
+import mlflow
+import mlflow.pytorch
+
+def train(args):
+    config_path = args.config
+    config_name = os.path.splitext(os.path.basename(config_path))[0]
+    
+    # Configure MLflow experiment
+    mlflow.set_experiment("Credit Score Training")
+    
+    with mlflow.start_run(run_name=config_name):
+        # Log all hyperparameters
+        mlflow.log_params(config)
+        mlflow.log_param("config_file", config_name)
+        
+        # Training loop
+        for epoch in range(epochs):
+            # ... training code ...
+            
+            # Log metrics per epoch
+            mlflow.log_metric("train_loss", epoch_loss, step=epoch)
+            mlflow.log_metric("train_accuracy", epoch_acc, step=epoch)
+        
+        # Log evaluation metrics
+        mlflow.log_metric("test_accuracy", acc)
+        mlflow.log_metric("test_roc_auc", roc_auc)
+        mlflow.log_metric("test_precision", precision)
+        mlflow.log_metric("test_recall", recall)
+        mlflow.log_metric("test_f1_score", f1)
+        
+        # Log visualization artifacts
+        mlflow.log_figure(plt.gcf(), "confusion_matrix.png")
+        mlflow.log_figure(plt.gcf(), "roc_curve.png")
+        mlflow.log_figure(plt.gcf(), "precision_recall_curve.png")
+        
+        # Log model artifacts
+        mlflow.log_artifact(model_save_path)
+```
+
+### Tracked Metrics
+
+The architecture tracks comprehensive metrics at different stages:
+
+<AccordionGroup>
+  <Accordion title="Training Metrics" icon="dumbbell">
+    - **train_loss**: Binary cross-entropy loss per epoch
+    - **train_accuracy**: Training accuracy per epoch
+    - **batch_size**: Number of samples per batch
+    - **learning_rate**: Optimizer learning rate
+  </Accordion>
+  
+  <Accordion title="Evaluation Metrics" icon="chart-simple">
+    - **test_accuracy**: Overall model accuracy on test set
+    - **test_roc_auc**: Area under ROC curve
+    - **test_precision**: Positive predictive value
+    - **test_recall**: Sensitivity/true positive rate
+    - **test_f1_score**: Harmonic mean of precision and recall
+  </Accordion>
+  
+  <Accordion title="Visual Artifacts" icon="image">
+    - **Confusion Matrix**: Classification performance heatmap
+    - **ROC Curve**: True vs false positive rate visualization
+    - **Precision-Recall Curve**: Trade-off visualization
+    - **Classification Report**: Detailed per-class metrics
+  </Accordion>
+</AccordionGroup>
+
+### Accessing MLflow UI
+
+Start the MLflow tracking server to visualize experiments:
+
+```bash
+# Start MLflow UI
+uv run mlflow ui
+
+# Access dashboard at http://127.0.0.1:5000
+```
+
+<Info>
+  The MLflow UI provides real-time visualization of training metrics, model comparisons, and artifact browsing. All experiments are stored in the `mlruns/` directory.
+</Info>
+
+## Model Versioning
+
+### Configuration-Based Versioning
+
+Models are versioned through YAML configuration files, enabling systematic experimentation:
+
+```yaml config/models-configs/model_config_001.yaml
+hidden_layers:
+  - 128
+  - 64
+  - 32
+activation_functions:
+  - relu
+  - relu
+  - relu
+dropout_rate: 0.3
+learning_rate: 0.0005
+epochs: 150
+batch_size: 64
+```
+
+**Versioning Strategy:**
+- `model_config_000.yaml` - Baseline configuration
+- `model_config_001.yaml` - Production configuration
+- `model_config_002.yaml` - Experimental variants
+
+### Model Artifacts
+
+Each training run produces versioned artifacts:
+
+```python
+# Model weights naming convention
+weights_name = config_name.replace("model_config", "model_weights")
+model_save_path = os.path.join(save_dir, f"{weights_name}.pth")
+
+# Example: model_config_001.yaml → model_weights_001.pth
+torch.save(model.state_dict(), model_save_path)
+mlflow.log_artifact(model_save_path)
+```
+
+**Artifact Structure:**
+```
+model/
+├── model_weights_000.pth  # Baseline model
+├── model_weights_001.pth  # Production model
+└── model_weights_002.pth  # Experimental variants
+
+mlruns/
+└── <experiment_id>/
+    └── <run_id>/
+        ├── artifacts/
+        │   ├── model_weights_001.pth
+        │   ├── confusion_matrix.png
+        │   ├── roc_curve.png
+        │   └── classification_report.txt
+        ├── metrics/
+        └── params/
+```
+
+## CI/CD Integration
+
+### Training Pipeline
+
+The architecture supports automated training pipelines:
+
+```bash
+# Command-line interface for automated execution
+uv run training/training.py --config config/models-configs/model_config_001.yaml
+```
+
+### Docker-Based Deployment
+
+Production deployment uses containerized environments:
+
+```yaml docker-compose.yml
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_PATH=/app/model/model_weights_001.pth
+      - CONFIG_PATH=/app/config/models-configs/model_config_001.yaml
+```
+
+<CardGroup cols={2}>
+  <Card title="Continuous Integration" icon="check">
+    - Automated testing on code changes
+    - Linting and type checking
+    - Training smoke tests
+  </Card>
+  <Card title="Continuous Deployment" icon="rocket">
+    - Containerized deployments
+    - Blue-green deployment strategy
+    - Automated rollback capabilities
+  </Card>
+</CardGroup>
+
+## Reproducibility
+
+### Environment Management
+
+The service ensures deterministic environments:
+
+```toml pyproject.toml
+[project]
+name = "credit-score-ai"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.0.0",
+    "mlflow>=2.8.0",
+    "fastapi>=0.100.0",
+    "scikit-learn>=1.3.0",
+]
+```
+
+**Reproducibility Features:**
+- **UV Lock File**: `uv.lock` ensures exact dependency versions
+- **Python Version**: `.python-version` pins Python runtime
+- **Random Seeds**: `random_state=42` for consistent data splits
+- **Docker Images**: Immutable runtime environments
+
+### Data Versioning
+
+Integration with DVC (Data Version Control) for dataset versioning:
+
+```python
+# Training references specific dataset versions
+dataset_path = os.path.join(
+    "datasets",
+    "credit_score_dataset",
+    "german_credit_risk_v1.0.0_training_23012026.csv"
+)
+```
+
+<Note>
+  Dataset versions are tracked via DVC, with `.dvc` files stored in Git and actual data in remote storage (S3, DagsHub, Azure Blob).
+</Note>
+
+## Inference Architecture
+
+### Singleton Predictor Pattern
+
+The inference system uses a singleton pattern for efficient model loading:
+
+```python inference/inference.py
+class Predictor:
+    """Singleton class for model inference."""
+    _instance = None
+    _initialized = False
+    
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(Predictor, cls).__new__(cls)
+        return cls._instance
+    
+    def __init__(self, model_path: str, config_path: str, preprocessor_path: str):
+        if Predictor._initialized:
+            return
+        
+        # Load configuration
+        with open(config_path, "r") as f:
+            yaml_config = yaml.safe_load(f)
+        
+        # Load preprocessor
+        self.preprocessor = joblib.load(preprocessor_path)
+        
+        # Initialize model with config
+        self.model = CreditScoreModel(model_config)
+        self.model.load_state_dict(torch.load(model_path, map_location=device))
+        self.model.eval()
+        
+        Predictor._initialized = True
+
+# Global singleton instance
+predictor = Predictor(
+    model_path=DEFAULT_MODEL_PATH,
+    config_path=DEFAULT_CONFIG_PATH,
+    preprocessor_path=DEFAULT_PREPROCESSOR_PATH
+)
+```
+
+**Benefits:**
+- Model loaded once at startup
+- Reduced inference latency
+- Memory efficient for high-throughput scenarios
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Experiment Organization" icon="folder-tree">
+    - Use descriptive experiment names
+    - Tag runs with metadata (dataset version, git commit)
+    - Archive failed experiments for learning
+  </Card>
+  
+  <Card title="Model Selection" icon="bullseye">
+    - Define success metrics upfront
+    - Compare models systematically via MLflow
+    - Document model selection rationale
+  </Card>
+  
+  <Card title="Artifact Management" icon="box-archive">
+    - Log all training artifacts
+    - Version control configurations
+    - Maintain artifact lineage
+  </Card>
+  
+  <Card title="Monitoring" icon="chart-line">
+    - Track inference latency
+    - Monitor prediction distributions
+    - Alert on model degradation
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Project Structure" icon="folder-tree" href="/concepts/project-structure">
+    Explore the modular project organization
+  </Card>
+  <Card title="Data Versioning" icon="database" href="/concepts/data-versioning">
+    Learn about DVC and data management
+  </Card>
+</CardGroup>

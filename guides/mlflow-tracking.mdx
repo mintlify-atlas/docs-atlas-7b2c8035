@@ -1,0 +1,629 @@
+---
+title: 'MLflow Tracking'
+description: 'Track experiments, visualize metrics, and manage model artifacts with MLflow'
+icon: 'chart-line'
+---
+
+This guide covers using MLflow for experiment tracking, model versioning, and performance visualization in the AI Data Science Service.
+
+## What is MLflow?
+
+MLflow is an open-source platform for managing the machine learning lifecycle, including:
+
+- **Experiment Tracking**: Log parameters, metrics, and artifacts
+- **Model Registry**: Version and manage trained models
+- **Visualization**: Compare runs and analyze performance
+- **Reproducibility**: Record everything needed to recreate results
+
+## Starting MLflow UI
+
+Launch the MLflow tracking server to access the web interface:
+
+```bash
+uv run mlflow ui
+```
+
+Access the dashboard at: **`http://127.0.0.1:5000`**
+
+<Tip>
+Keep MLflow running in a separate terminal window while training models for real-time tracking.
+</Tip>
+
+### MLflow Storage
+
+All experiment data is stored locally in the `mlruns/` directory:
+
+```
+mlruns/
+├── 0/                          # Default experiment
+├── 1/                          # Credit Score Training experiment
+│   ├── meta.yaml              # Experiment metadata
+│   ├── <run-id-1>/            # Individual training run
+│   │   ├── artifacts/         # Saved model weights, plots
+│   │   ├── metrics/           # Training metrics (loss, accuracy)
+│   │   ├── params/            # Hyperparameters
+│   │   └── tags/              # Run metadata
+│   └── <run-id-2>/            # Another training run
+└── models/                     # Model registry (optional)
+```
+
+<Note>
+The `mlruns/` directory is automatically created when you run your first training experiment.
+</Note>
+
+## MLflow Integration in Training
+
+The training script automatically logs everything to MLflow:
+
+### Experiment Setup
+
+```python
+mlflow.set_experiment("Credit Score Training")
+
+with mlflow.start_run(run_name=config_name):
+    mlflow.log_params(config)
+    mlflow.log_param("config_file", config_name)
+    # ... training code ...
+```
+
+Reference: `training/training.py:65-70`
+
+<Accordion title="What gets logged?">
+  **Parameters**:
+  - `hidden_layers`: Network architecture
+  - `activation_functions`: Activation types per layer
+  - `dropout_rate`: Regularization rate
+  - `learning_rate`: Optimizer learning rate
+  - `epochs`: Number of training epochs
+  - `batch_size`: Batch size for training
+  - `config_file`: Configuration filename
+
+  **Metrics** (per epoch):
+  - `train_loss`: Training loss
+  - `train_accuracy`: Training accuracy
+  
+  **Test Metrics** (final):
+  - `test_accuracy`: Test set accuracy
+  - `test_roc_auc`: Area under ROC curve
+  - `test_precision`: Precision score
+  - `test_recall`: Recall score
+  - `test_f1_score`: F1 score
+
+  **Artifacts**:
+  - `model_weights_*.pth`: Trained model weights
+  - `confusion_matrix.png`: Confusion matrix visualization
+  - `roc_curve.png`: ROC curve plot
+  - `precision_recall_curve.png`: Precision-recall curve
+  - `classification_report.txt`: Detailed classification metrics
+</Accordion>
+
+### Logging Metrics During Training
+
+Metrics are logged at each epoch:
+
+```python
+for epoch in range(epochs):
+    # ... training loop ...
+    
+    epoch_loss = running_loss / len(train_loader)
+    epoch_acc = correct / total
+    
+    mlflow.log_metric("train_loss", epoch_loss, step=epoch)
+    mlflow.log_metric("train_accuracy", epoch_acc, step=epoch)
+```
+
+Reference: `training/training.py:151-158`
+
+### Logging Test Metrics
+
+Final evaluation metrics are logged after training:
+
+```python
+mlflow.log_metric("test_accuracy", acc)
+mlflow.log_metric("test_roc_auc", roc_auc)
+mlflow.log_metric("test_precision", precision)
+mlflow.log_metric("test_recall", recall)
+mlflow.log_metric("test_f1_score", f1)
+```
+
+Reference: `training/training.py:179-183`
+
+### Logging Artifacts
+
+Visualizations and model files are logged as artifacts:
+
+```python
+# Log confusion matrix
+plt.figure(figsize=(8, 6))
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
+mlflow.log_figure(plt.gcf(), "confusion_matrix.png")
+
+# Log ROC curve
+plt.plot(fpr, tpr, label=f"ROC Curve (AUC = {roc_auc:.2f})")
+mlflow.log_figure(plt.gcf(), "roc_curve.png")
+
+# Log model weights
+mlflow.log_artifact(model_save_path)
+```
+
+Reference: `training/training.py:188-236`
+
+## Using the MLflow UI
+
+### Experiments View
+
+When you open `http://127.0.0.1:5000`, you'll see:
+
+<Steps>
+  <Step title="Select Experiment">
+    Click on **"Credit Score Training"** from the experiments list to view all related training runs.
+  </Step>
+
+  <Step title="View Runs Table">
+    The main table shows all training runs with columns for:
+    - **Run Name**: Configuration name (e.g., `model_config_001`)
+    - **Created**: Timestamp of training start
+    - **Duration**: How long training took
+    - **Metrics**: Quick view of key metrics
+    - **Parameters**: Hyperparameter values
+  </Step>
+
+  <Step title="Sort and Filter">
+    - **Sort** by clicking column headers (e.g., sort by `test_accuracy`)
+    - **Filter** using the search bar (e.g., `metrics.test_accuracy > 0.8`)
+    - **Select** multiple runs to compare
+  </Step>
+</Steps>
+
+### Run Details View
+
+Click on any run to see detailed information:
+
+<Tabs>
+  <Tab title="Overview">
+    - **Run ID**: Unique identifier
+    - **Status**: Finished, Running, or Failed
+    - **Duration**: Total training time
+    - **User**: Who ran the experiment
+    - **Source**: Script path and Git commit (if available)
+  </Tab>
+  
+  <Tab title="Parameters">
+    All hyperparameters logged during training:
+    
+    ```yaml
+    hidden_layers: [128, 64, 32]
+    activation_functions: [relu, relu, relu]
+    dropout_rate: 0.3
+    learning_rate: 0.0005
+    epochs: 150
+    batch_size: 64
+    config_file: model_config_001
+    ```
+  </Tab>
+  
+  <Tab title="Metrics">
+    Visualizations of metrics over time:
+    
+    - **Training Loss**: Line chart showing loss decrease
+    - **Training Accuracy**: Accuracy improvement per epoch
+    - **Test Metrics**: Final evaluation scores
+    
+    You can:
+    - Toggle between different metrics
+    - Zoom into specific epoch ranges
+    - Download charts as images
+  </Tab>
+  
+  <Tab title="Artifacts">
+    All saved files from the training run:
+    
+    - **Model Weights**: `model_weights_001.pth`
+    - **Confusion Matrix**: Heatmap showing predictions vs actual
+    - **ROC Curve**: True positive rate vs false positive rate
+    - **Precision-Recall Curve**: Precision vs recall tradeoff
+    - **Classification Report**: Detailed per-class metrics
+    
+    Click any artifact to view or download it.
+  </Tab>
+  
+  <Tab title="System Info">
+    Environment information:
+    - Python version
+    - Operating system
+    - CPU/GPU information
+    - Installed packages
+  </Tab>
+</Tabs>
+
+## Comparing Experiments
+
+### Side-by-Side Comparison
+
+<Steps>
+  <Step title="Select Multiple Runs">
+    In the experiments table, check the boxes next to 2 or more runs you want to compare.
+  </Step>
+
+  <Step title="Click Compare">
+    Click the **"Compare"** button at the top of the table.
+  </Step>
+
+  <Step title="Analyze Differences">
+    The comparison view shows:
+    
+    **Parameter Differences**:
+    - Highlights parameters that differ between runs
+    - Shows which values led to better performance
+    
+    **Metric Comparison**:
+    - Side-by-side metrics table
+    - Visual charts overlaying multiple runs
+    - Statistical differences highlighted
+    
+    **Artifacts**:
+    - Compare confusion matrices
+    - Overlay ROC curves
+  </Step>
+</Steps>
+
+### Example Comparison Workflow
+
+Comparing two configurations:
+
+```python
+# Run 1: model_config_001.yaml
+hidden_layers: [128, 64, 32]
+learning_rate: 0.0005
+test_accuracy: 0.8234
+
+# Run 2: model_config_002.yaml  
+hidden_layers: [256, 128, 64, 32]
+learning_rate: 0.0001
+test_accuracy: 0.8456
+```
+
+**Insights**:
+- Deeper network (Run 2) achieved +2.2% accuracy
+- Lower learning rate was more stable
+- Training time increased by 30%
+
+<Tip>
+Use the comparison view to identify which hyperparameters have the biggest impact on performance.
+</Tip>
+
+## Advanced MLflow Features
+
+### Searching Experiments
+
+Use the search bar with MLflow query syntax:
+
+<CodeGroup>
+```sql Find Best Accuracy
+metrics.test_accuracy > 0.85
+```
+
+```sql Filter by Parameter
+params.learning_rate = '0.0005'
+```
+
+```sql Combine Conditions
+metrics.test_accuracy > 0.8 AND params.dropout_rate = '0.3'
+```
+
+```sql Recent Runs
+attributes.start_time > 1704067200000
+```
+</CodeGroup>
+
+### Downloading Artifacts
+
+<Tabs>
+  <Tab title="Via UI">
+    1. Navigate to a run's Artifacts tab
+    2. Click on any artifact (e.g., `model_weights_001.pth`)
+    3. Click the **Download** button
+  </Tab>
+  
+  <Tab title="Via CLI">
+    ```bash
+    # Download all artifacts from a run
+    mlflow artifacts download \
+      --run-id <run-id> \
+      --dst-path ./downloaded_artifacts
+    
+    # Download specific artifact
+    mlflow artifacts download \
+      --run-id <run-id> \
+      --artifact-path model_weights_001.pth \
+      --dst-path ./models
+    ```
+  </Tab>
+  
+  <Tab title="Via Python">
+    ```python
+    import mlflow
+    
+    # Download artifact
+    artifact_path = mlflow.artifacts.download_artifacts(
+        run_id="<run-id>",
+        artifact_path="model_weights_001.pth",
+        dst_path="./models"
+    )
+    
+    print(f"Downloaded to: {artifact_path}")
+    ```
+  </Tab>
+</Tabs>
+
+### Tagging Runs
+
+Add custom tags to organize experiments:
+
+```python
+with mlflow.start_run() as run:
+    # Set tags
+    mlflow.set_tag("model_type", "neural_network")
+    mlflow.set_tag("dataset_version", "v1.0.0")
+    mlflow.set_tag("experiment_purpose", "baseline")
+    mlflow.set_tag("production_ready", "true")
+    
+    # ... training code ...
+```
+
+Then filter by tags in the UI:
+
+```sql
+tags.production_ready = 'true'
+```
+
+## Visualizing Training Progress
+
+### Training Loss Curve
+
+The loss curve shows model improvement over epochs:
+
+<Accordion title="Interpreting Loss Curves">
+  **Healthy Training**:
+  - Smooth, steady decrease
+  - Converges to a low value
+  - No erratic jumps
+  
+  **Overfitting**:
+  - Training loss keeps decreasing
+  - Validation loss starts increasing
+  - Gap between train and test widens
+  
+  **Underfitting**:
+  - Loss plateaus at a high value
+  - Little improvement over epochs
+  - Both train and test loss are high
+  
+  **Unstable Training**:
+  - Loss oscillates wildly
+  - Large spikes or drops
+  - May indicate learning rate is too high
+</Accordion>
+
+### ROC Curve Analysis
+
+The ROC curve (`roc_curve.png`) shows classifier performance:
+
+- **AUC = 1.0**: Perfect classifier
+- **AUC = 0.9-0.95**: Excellent performance
+- **AUC = 0.8-0.9**: Good performance  
+- **AUC = 0.7-0.8**: Fair performance
+- **AUC = 0.5**: Random guessing
+
+Reference: `training/training.py:199-210`
+
+### Confusion Matrix
+
+The confusion matrix shows prediction distribution:
+
+```
+                Predicted
+              Bad    Good
+Actual Bad    [TN]   [FP]
+       Good   [FN]   [TP]
+```
+
+**Ideal Matrix**:
+- High values on diagonal (TN, TP)
+- Low values off diagonal (FP, FN)
+
+Reference: `training/training.py:188-197`
+
+## Model Registry (Advanced)
+
+### Registering Models
+
+Promote trained models to the registry:
+
+```python
+# During training
+mlflow.pytorch.log_model(
+    pytorch_model=model,
+    artifact_path="model",
+    registered_model_name="CreditScoreModel"
+)
+```
+
+### Model Versioning
+
+The registry tracks versions:
+
+- **Version 1**: Initial baseline model
+- **Version 2**: Improved architecture
+- **Version 3**: Fine-tuned hyperparameters
+
+### Transitioning Model Stages
+
+```python
+import mlflow
+from mlflow.tracking import MlflowClient
+
+client = MlflowClient()
+
+# Promote to Staging
+client.transition_model_version_stage(
+    name="CreditScoreModel",
+    version=2,
+    stage="Staging"
+)
+
+# Promote to Production
+client.transition_model_version_stage(
+    name="CreditScoreModel",
+    version=2,
+    stage="Production"
+)
+```
+
+**Available Stages**:
+- **None**: Experimental, not deployed
+- **Staging**: Testing in staging environment
+- **Production**: Deployed to production
+- **Archived**: Deprecated, no longer used
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Descriptive Run Names">
+    Name runs based on configuration or experiment purpose:
+    
+    ```python
+    with mlflow.start_run(run_name="deep_net_high_dropout"):
+        # ...
+    ```
+    
+    This makes it easier to identify runs later.
+  </Accordion>
+  
+  <Accordion title="Log Early, Log Often">
+    Don't wait until the end to log metrics:
+    
+    ```python
+    for epoch in range(epochs):
+        # Log per-epoch metrics
+        mlflow.log_metric("train_loss", loss, step=epoch)
+    ```
+    
+    Real-time logging helps you:
+    - Stop training early if not converging
+    - Monitor progress remotely
+    - Debug issues as they occur
+  </Accordion>
+  
+  <Accordion title="Version Everything">
+    Log dataset versions, code versions, and environment info:
+    
+    ```python
+    mlflow.set_tag("dataset_version", "v1.0.0")
+    mlflow.set_tag("git_commit", subprocess.check_output(
+        ["git", "rev-parse", "HEAD"]
+    ).decode().strip())
+    ```
+  </Accordion>
+  
+  <Accordion title="Clean Up Failed Runs">
+    Delete incomplete or failed runs to keep things organized:
+    
+    ```python
+    from mlflow.tracking import MlflowClient
+    
+    client = MlflowClient()
+    client.delete_run(run_id="<failed-run-id>")
+    ```
+  </Accordion>
+  
+  <Accordion title="Backup MLflow Data">
+    Regularly backup the `mlruns/` directory:
+    
+    ```bash
+    # Create backup
+    tar -czf mlruns_backup_$(date +%Y%m%d).tar.gz mlruns/
+    
+    # Or use rsync for incremental backups
+    rsync -av mlruns/ /backup/mlruns/
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<Accordion title="MLflow UI shows no experiments">
+  **Solution**:
+  1. Ensure you're in the correct directory (where `mlruns/` exists)
+  2. Check that training script ran successfully
+  3. Verify `mlflow.set_experiment()` is called in your code
+  4. Try: `mlflow ui --backend-store-uri file:///path/to/mlruns`
+</Accordion>
+
+<Accordion title="Metrics not updating in real-time">
+  **Solution**:
+  1. Refresh the browser page
+  2. Check that `mlflow.log_metric()` is called with `step` parameter
+  3. Ensure training script hasn't crashed
+  4. Restart MLflow UI
+</Accordion>
+
+<Accordion title="Cannot access MLflow on port 5000">
+  **Solution**:
+  1. Check if port is already in use: `lsof -i :5000`
+  2. Use a different port: `mlflow ui --port 5001`
+  3. Check firewall settings
+</Accordion>
+
+<Accordion title="Artifacts not appearing">
+  **Solution**:
+  1. Verify `mlflow.log_artifact()` is called
+  2. Check file paths are correct
+  3. Ensure files exist before logging
+  4. Look for errors in training logs
+</Accordion>
+
+## Remote MLflow Tracking
+
+For team collaboration, set up a remote tracking server:
+
+### Server Setup
+
+```bash
+# Start MLflow server
+mlflow server \
+  --backend-store-uri postgresql://user:pass@localhost/mlflow \
+  --default-artifact-root s3://my-bucket/mlflow \
+  --host 0.0.0.0 \
+  --port 5000
+```
+
+### Client Configuration
+
+```python
+import mlflow
+
+# Point to remote server
+mlflow.set_tracking_uri("http://mlflow-server:5000")
+
+# Now logging will go to the remote server
+with mlflow.start_run():
+    mlflow.log_metric("accuracy", 0.85)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Training Models" icon="brain" href="/guides/training-models">
+    Run experiments and track them in MLflow
+  </Card>
+  <Card title="Model Configuration" icon="sliders" href="/guides/model-configuration">
+    Tune hyperparameters and compare results
+  </Card>
+  <Card title="Running Inference" icon="play" href="/guides/running-inference">
+    Deploy your best model from MLflow
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/guides/deployment">
+    Deploy with Docker for production
+  </Card>
+</CardGroup>

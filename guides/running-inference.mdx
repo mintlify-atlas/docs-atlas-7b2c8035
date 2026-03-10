@@ -1,0 +1,570 @@
+---
+title: 'Running Inference'
+description: 'Make predictions with trained models using the inference API and Predictor class'
+icon: 'play'
+---
+
+This guide covers how to use trained models for making predictions, both programmatically through the Predictor class and via the REST API.
+
+## Overview
+
+The inference system loads a trained model and preprocessor to make credit risk predictions. It follows a singleton pattern for efficient resource usage.
+
+## Predictor Class
+
+The `Predictor` class (`inference/inference.py:20-146`) is a singleton that manages model loading and inference.
+
+### Architecture
+
+```python
+class Predictor:
+    """
+    Singleton class for model inference.
+    Loads the model weights, configuration, and preprocessor.
+    """
+    _instance = None
+    _initialized = False
+```
+
+Reference: `inference/inference.py:20-27`
+
+<Note>
+The singleton pattern ensures the model is loaded only once, improving performance and memory efficiency.
+</Note>
+
+### Initialization
+
+The Predictor requires three components:
+
+<Steps>
+  <Step title="Model Weights (.pth)">
+    PyTorch state dictionary containing trained weights:
+
+    ```python
+    model_path = "model/model_weights_001.pth"
+    ```
+  </Step>
+
+  <Step title="Configuration File (.yaml)">
+    YAML file defining the model architecture:
+
+    ```python
+    config_path = "config/models-configs/model_config_001.yaml"
+    ```
+  </Step>
+
+  <Step title="Preprocessor (.joblib)">
+    Scikit-learn pipeline for data transformation:
+
+    ```python
+    preprocessor_path = "processing/preprocessor.joblib"
+    ```
+  </Step>
+</Steps>
+
+### Default Predictor Instance
+
+A global predictor instance is created automatically with default paths:
+
+```python
+predictor = Predictor(
+    model_path=DEFAULT_MODEL_PATH,
+    config_path=DEFAULT_CONFIG_PATH,
+    preprocessor_path=DEFAULT_PREPROCESSOR_PATH,
+)
+```
+
+Reference: `inference/inference.py:161-165`
+
+## Making Predictions Programmatically
+
+### Using the Predictor Class Directly
+
+```python
+from inference.inference import predictor
+from server.schemas import CreditRiskInput
+
+# Create input data
+sample_input = CreditRiskInput(
+    Age=35,
+    Sex="male",
+    Job="skilled",
+    Housing="own",
+    Saving_accounts="NA",
+    Checking_account="little",
+    Credit_amount=9055.0,
+    Duration=36,
+    Purpose="education",
+)
+
+# Run inference
+result = predictor.inference(sample_input)
+print(result)
+# Output: {'prediction': 'good', 'probability': 0.8234}
+```
+
+Reference: `inference/inference.py:174-193`
+
+### Understanding the Response
+
+The inference method returns a dictionary with two fields:
+
+```python
+{
+    "prediction": "good",    # Binary classification: "good" or "bad"
+    "probability": 0.8234   # Probability of "good" credit risk (0-1)
+}
+```
+
+<Tabs>
+  <Tab title="Good Credit Risk">
+    ```json
+    {
+      "prediction": "good",
+      "probability": 0.85
+    }
+    ```
+    High probability (> 0.5) indicates the customer is likely to repay the credit.
+  </Tab>
+  <Tab title="Bad Credit Risk">
+    ```json
+    {
+      "prediction": "bad",
+      "probability": 0.32
+    }
+    ```
+    Low probability (< 0.5) indicates higher risk of default.
+  </Tab>
+</Tabs>
+
+### Inference Process Flow
+
+The inference method follows these steps:
+
+<Steps>
+  <Step title="Convert Input to Dictionary">
+    ```python
+    input_dict = data.model_dump(by_alias=True)
+    ```
+    Converts Pydantic model to dictionary using field aliases.
+
+    Reference: `inference/inference.py:123`
+  </Step>
+
+  <Step title="Create DataFrame">
+    ```python
+    df = pd.DataFrame([input_dict])
+    ```
+    Wraps input in a pandas DataFrame for preprocessing.
+
+    Reference: `inference/inference.py:126`
+  </Step>
+
+  <Step title="Apply Preprocessing">
+    ```python
+    processed_data = self.preprocessor.transform(df)
+    ```
+    Applies the same transformations used during training.
+
+    Reference: `inference/inference.py:129`
+  </Step>
+
+  <Step title="Convert to Tensor">
+    ```python
+    tensor_data = torch.FloatTensor(processed_data).to(device)
+    ```
+    Converts to PyTorch tensor on appropriate device (CPU/GPU).
+
+    Reference: `inference/inference.py:133`
+  </Step>
+
+  <Step title="Model Prediction">
+    ```python
+    with torch.no_grad():
+        probs = self.model.predict_probability(tensor_data)
+        good_prob = probs[0][1].item()
+    ```
+    Runs forward pass without gradient computation.
+
+    Reference: `inference/inference.py:136-139`
+  </Step>
+
+  <Step title="Binary Classification">
+    ```python
+    prediction_idx = torch.argmax(probs, dim=1).item()
+    prediction = "good" if prediction_idx == 1 else "bad"
+    ```
+    Converts probability to binary prediction.
+
+    Reference: `inference/inference.py:142-143`
+  </Step>
+</Steps>
+
+## REST API Inference
+
+### Starting the API Server
+
+Launch the FastAPI server for HTTP-based inference:
+
+<CodeGroup>
+```bash Development Mode
+uv run uvicorn server.api:app --reload --port 8000
+```
+
+```bash Production Mode
+uvicorn server.api:app --host 0.0.0.0 --port 8000
+```
+</CodeGroup>
+
+The API will be available at `http://localhost:8000`
+
+<Tip>
+Access interactive API documentation at `http://localhost:8000/docs`
+</Tip>
+
+### API Endpoint
+
+**Endpoint**: `POST /credit_score_prediction`
+
+Reference: `server/api.py:58-84`
+
+### Request Format
+
+<CodeGroup>
+```json Request Body
+{
+  "Age": 35,
+  "Sex": "male",
+  "Job": "skilled",
+  "Housing": "own",
+  "Saving accounts": "NA",
+  "Checking account": "little",
+  "Credit amount": 9055.0,
+  "Duration": 36,
+  "Purpose": "education"
+}
+```
+
+```bash cURL
+curl -X POST "http://localhost:8000/credit_score_prediction" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "Age": 35,
+    "Sex": "male",
+    "Job": "skilled",
+    "Housing": "own",
+    "Saving accounts": "NA",
+    "Checking account": "little",
+    "Credit amount": 9055.0,
+    "Duration": 36,
+    "Purpose": "education"
+  }'
+```
+
+```python Python (requests)
+import requests
+
+url = "http://localhost:8000/credit_score_prediction"
+data = {
+    "Age": 35,
+    "Sex": "male",
+    "Job": "skilled",
+    "Housing": "own",
+    "Saving accounts": "NA",
+    "Checking account": "little",
+    "Credit amount": 9055.0,
+    "Duration": 36,
+    "Purpose": "education"
+}
+
+response = requests.post(url, json=data)
+print(response.json())
+```
+
+```javascript JavaScript (fetch)
+const response = await fetch('http://localhost:8000/credit_score_prediction', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    Age: 35,
+    Sex: 'male',
+    Job: 'skilled',
+    Housing: 'own',
+    'Saving accounts': 'NA',
+    'Checking account': 'little',
+    'Credit amount': 9055.0,
+    Duration: 36,
+    Purpose: 'education'
+  })
+});
+
+const result = await response.json();
+console.log(result);
+```
+</CodeGroup>
+
+### Response Format
+
+```json
+{
+  "prediction": "good",
+  "probability": 0.8234
+}
+```
+
+## Input Schema Validation
+
+The API uses Pydantic for strict input validation. All fields are required and type-checked:
+
+### Field Specifications
+
+| Field | Type | Allowed Values | Example |
+|-------|------|----------------|----------|
+| **Age** | Integer | > 0 | `35` |
+| **Sex** | String | `male`, `female` | `"male"` |
+| **Job** | String | `unskilled and non-resident`, `unskilled and resident`, `skilled`, `highly skilled` | `"skilled"` |
+| **Housing** | String | `own`, `rent`, `free` | `"own"` |
+| **Saving accounts** | String | `NA`, `little`, `moderate`, `quite rich`, `rich` | `"NA"` |
+| **Checking account** | String | `NA`, `little`, `moderate`, `rich` | `"little"` |
+| **Credit amount** | Float | > 0 | `9055.0` |
+| **Duration** | Integer | > 0 | `36` |
+| **Purpose** | String | `car`, `furniture/equipment`, `radio/TV`, `domestic appliances`, `repairs`, `education`, `business`, `vacation/others` | `"education"` |
+
+Reference: `server/schemas.py:51-96`
+
+<Warning>
+Invalid values will result in a 422 Unprocessable Entity error with detailed validation messages.
+</Warning>
+
+### Example Validation Error
+
+```json Request with Invalid Age
+{
+  "Age": -5,  // Invalid: must be > 0
+  "Sex": "male",
+  ...
+}
+```
+
+```json Response (422)
+{
+  "detail": [
+    {
+      "type": "greater_than",
+      "loc": ["body", "Age"],
+      "msg": "Input should be greater than 0",
+      "input": -5
+    }
+  ]
+}
+```
+
+## Testing Inference
+
+### Built-in Test Script
+
+The inference module includes a test script:
+
+```bash
+uv run python -m inference.inference
+```
+
+This will:
+1. Initialize the predictor
+2. Run inference on sample data
+3. Verify singleton behavior
+4. Display results
+
+Reference: `inference/inference.py:167-213`
+
+### Expected Output
+
+```
+==================================================
+TESTING CREDIT SCORE PREDICTOR
+==================================================
+
+[1] Input data sample:
+{
+    "Age": 35,
+    "Sex": "male",
+    "Job": "skilled",
+    ...
+}
+
+[2] Inference result:
+{'prediction': 'good', 'probability': 0.8234}
+
+[3] Singleton Verification: True
+
+SUCCESS: Predictor class and inference function are working correctly!
+```
+
+## Custom Predictor Instances
+
+You can create custom predictor instances with different models:
+
+```python
+from inference.inference import Predictor
+
+# Load a different model
+custom_predictor = Predictor(
+    model_path="model/model_weights_002.pth",
+    config_path="config/models-configs/model_config_002.yaml",
+    preprocessor_path="processing/preprocessor.joblib",
+)
+
+result = custom_predictor.inference(input_data)
+```
+
+<Note>
+Due to the singleton pattern, only the first instantiation will actually load the model. Subsequent calls return the existing instance.
+</Note>
+
+## Performance Considerations
+
+### Model Loading Time
+
+<AccordionGroup>
+  <Accordion title="Initial Load">
+    The first prediction includes model loading overhead:
+    - Loading YAML configuration
+    - Loading preprocessor (joblib)
+    - Initializing PyTorch model
+    - Loading trained weights
+
+    **Typical time**: 1-3 seconds
+  </Accordion>
+
+  <Accordion title="Subsequent Predictions">
+    After initialization, predictions are fast:
+    - No reloading required (singleton)
+    - Pure inference time
+
+    **Typical time**: 5-20 milliseconds
+  </Accordion>
+</AccordionGroup>
+
+### Batch Predictions
+
+For multiple predictions, the API handles them sequentially. For high-throughput scenarios, consider:
+
+```python
+# Process multiple inputs
+inputs = [input1, input2, input3]
+results = [predictor.inference(inp) for inp in inputs]
+```
+
+<Tip>
+For production deployments, use multiple workers with Gunicorn or deploy behind a load balancer.
+</Tip>
+
+## Troubleshooting
+
+<Accordion title="FileNotFoundError: Model weights not found">
+  **Error**: `FileNotFoundError: Model weights file not found: model/model_weights_001.pth`
+
+  **Solution**: 
+  - Ensure you've trained a model first
+  - Check the file path matches your trained model
+  - Verify the model was saved successfully during training
+</Accordion>
+
+<Accordion title="Shape mismatch error">
+  **Error**: `RuntimeError: size mismatch`
+
+  **Solution**:
+  - Ensure the configuration file matches the trained model
+  - Verify the preprocessor was created during the same training run
+  - Check that input features match training data
+</Accordion>
+
+<Accordion title="API returns 500 Internal Server Error">
+  **Possible causes**:
+  - Model files are missing or corrupted
+  - Preprocessor is incompatible
+  - Invalid configuration
+
+  **Solution**:
+  - Check server logs for detailed error messages
+  - Verify all three required files exist
+  - Retrain the model if files are corrupted
+</Accordion>
+
+<Accordion title="Predictions seem incorrect">
+  **Debugging steps**:
+  1. Check which model weights are loaded
+  2. Verify the model's training performance in MLflow
+  3. Validate input data format and ranges
+  4. Test with known examples from training set
+</Accordion>
+
+## Best Practices
+
+<Steps>
+  <Step title="Validate Inputs">
+    Always use the Pydantic schemas to ensure data quality:
+
+    ```python
+    from server.schemas import CreditRiskInput
+    
+    # This will raise validation errors for invalid data
+    validated_input = CreditRiskInput(**raw_data)
+    ```
+  </Step>
+
+  <Step title="Handle Errors Gracefully">
+    Wrap inference calls in try-except blocks:
+
+    ```python
+    try:
+        result = predictor.inference(input_data)
+    except Exception as e:
+        logger.error(f"Inference failed: {e}")
+        # Handle error appropriately
+    ```
+  </Step>
+
+  <Step title="Monitor Performance">
+    Track inference latency and throughput in production:
+
+    ```python
+    import time
+    
+    start = time.time()
+    result = predictor.inference(input_data)
+    latency = time.time() - start
+    
+    logger.info(f"Inference completed in {latency:.3f}s")
+    ```
+  </Step>
+
+  <Step title="Version Your Models">
+    Keep track of which model version is deployed:
+
+    ```python
+    # Use environment variables or configuration
+    MODEL_VERSION = os.getenv("MODEL_VERSION", "001")
+    model_path = f"model/model_weights_{MODEL_VERSION}.pth"
+    ```
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deployment" icon="rocket" href="/guides/deployment">
+    Deploy the inference API to production with Docker
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/inference/overview">
+    Explore complete API documentation
+  </Card>
+  <Card title="Training Models" icon="brain" href="/guides/training-models">
+    Train new models with different configurations
+  </Card>
+  <Card title="MLflow Tracking" icon="chart-line" href="/guides/mlflow-tracking">
+    Monitor model performance and experiments
+  </Card>
+</CardGroup>

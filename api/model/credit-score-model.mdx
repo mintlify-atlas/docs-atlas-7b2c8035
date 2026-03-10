@@ -1,0 +1,238 @@
+---
+title: "CreditScoreModel"
+description: "Neural network model for credit score prediction using PyTorch"
+---
+
+## Overview
+
+The `CreditScoreModel` is a fully connected neural network built with PyTorch for binary credit risk classification. It implements a flexible architecture with configurable hidden layers, activation functions, batch normalization, and dropout regularization.
+
+## Class Definition
+
+```python
+class CreditScoreModel(nn.Module):
+    def __init__(self, config: ModelConfig)
+```
+
+### Parameters
+
+<ParamField path="config" type="ModelConfig" required>
+  Configuration object that defines the model architecture, including:
+  - `input_size`: Number of input features
+  - `hidden_layers`: List of hidden layer dimensions
+  - `activation_functions`: List of activation function names
+  - `output_size`: Number of output neurons (default: 1)
+  - `dropout_rate`: Dropout probability for regularization
+  
+  See [Model Configuration](/api/model/configuration) for details.
+</ParamField>
+
+## Architecture
+
+The model automatically constructs a sequential architecture with the following components for each hidden layer:
+
+1. **Linear Layer**: Fully connected transformation
+2. **Batch Normalization**: Normalizes activations (mean=0, std=1) for stable training
+3. **Activation Function**: Non-linear transformation (ReLU, LeakyReLU, GELU, Sigmoid, Softmax, or Tanh)
+4. **Dropout**: Regularization to prevent overfitting
+
+<Note>
+  The model validates that the number of hidden layers matches the number of activation functions at initialization.
+</Note>
+
+## Weight Initialization
+
+The model uses optimal weight initialization strategies based on the activation function:
+
+- **He/Kaiming Initialization**: For ReLU, LeakyReLU, and GELU activations
+- **Xavier/Glorot Initialization**: For Sigmoid, Tanh, and Softmax activations
+- **Bias**: Always initialized to zeros
+
+## Methods
+
+### forward()
+
+Performs the forward pass through the network.
+
+```python
+def forward(self, x: torch.Tensor) -> torch.Tensor
+```
+
+<ParamField path="x" type="torch.Tensor" required>
+  Input tensor of shape `(batch_size, input_size)`
+</ParamField>
+
+<ResponseField name="output" type="torch.Tensor">
+  Raw logits of shape `(batch_size, output_size)` before sigmoid activation
+</ResponseField>
+
+#### Example
+
+```python
+import torch
+from model.model import CreditScoreModel, ModelConfig
+
+# Initialize model
+config = ModelConfig(
+    input_size=20,
+    hidden_layers=[128, 64, 32],
+    activation_functions=["relu", "relu", "relu"],
+    dropout_rate=0.3
+)
+model = CreditScoreModel(config)
+
+# Forward pass
+x = torch.randn(32, 20)  # batch_size=32, input_size=20
+logits = model.forward(x)
+print(logits.shape)  # torch.Size([32, 1])
+```
+
+### predict_probability()
+
+Computes class probabilities for both Bad (0) and Good (1) credit risk.
+
+```python
+def predict_probability(self, x: torch.Tensor) -> torch.Tensor
+```
+
+<ParamField path="x" type="torch.Tensor" required>
+  Input tensor of shape `(batch_size, input_size)`
+</ParamField>
+
+<ResponseField name="probabilities" type="torch.Tensor">
+  Tensor of shape `(batch_size, 2)` containing:
+  - Column 0: Probability of Bad credit (Class 0)
+  - Column 1: Probability of Good credit (Class 1)
+</ResponseField>
+
+<Note>
+  This method runs in inference mode with gradients disabled (`torch.no_grad()`).
+</Note>
+
+#### Example
+
+```python
+# Predict probabilities
+x_test = torch.randn(10, 20)
+probs = model.predict_probability(x_test)
+print(probs.shape)  # torch.Size([10, 2])
+print(probs[0])     # tensor([0.3521, 0.6479]) - Bad: 35.21%, Good: 64.79%
+```
+
+### binary_prediction()
+
+Produces binary credit risk predictions using a probability threshold.
+
+```python
+def binary_prediction(self, x: torch.Tensor, threshold: float = 0.5) -> torch.Tensor
+```
+
+<ParamField path="x" type="torch.Tensor" required>
+  Input tensor of shape `(batch_size, input_size)`
+</ParamField>
+
+<ParamField path="threshold" type="float" default="0.5">
+  Decision threshold for binary classification. Predictions with probability >= threshold are classified as Good (1), otherwise Bad (0).
+</ParamField>
+
+<ResponseField name="predictions" type="torch.Tensor">
+  Binary predictions of shape `(batch_size, 1)` where:
+  - 0 = Bad credit risk
+  - 1 = Good credit risk
+</ResponseField>
+
+#### Example
+
+```python
+# Binary predictions with default threshold
+predictions = model.binary_prediction(x_test)
+print(predictions.shape)  # torch.Size([10, 1])
+print(predictions[:5])    # tensor([[1], [0], [1], [1], [0]])
+
+# Custom threshold for conservative predictions
+conservative_preds = model.binary_prediction(x_test, threshold=0.7)
+```
+
+### get_model_summary()
+
+Returns a string representation of the model architecture.
+
+```python
+def get_model_summary(self) -> str
+```
+
+<ResponseField name="summary" type="str">
+  String describing all layers in the sequential model
+</ResponseField>
+
+#### Example
+
+```python
+print(model.get_model_summary())
+# Sequential(
+#   (0): Linear(in_features=20, out_features=128, bias=True)
+#   (1): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+#   (2): ReLU()
+#   (3): Dropout(p=0.3, inplace=False)
+#   ...
+# )
+```
+
+## Training Example
+
+<CodeGroup>
+```python Training Loop
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
+
+# Prepare data
+X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
+y_train_tensor = torch.tensor(y_train.values, dtype=torch.float32).unsqueeze(1)
+train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+
+# Initialize model
+config = ModelConfig(
+    input_size=X_train.shape[1],
+    hidden_layers=[128, 64, 32],
+    activation_functions=["relu", "relu", "relu"],
+    dropout_rate=0.3,
+    learning_rate=0.0005,
+    epochs=150,
+    batch_size=64
+)
+model = CreditScoreModel(config)
+
+# Loss and optimizer
+criterion = nn.BCEWithLogitsLoss()
+optimizer = optim.AdamW(model.parameters(), lr=config.learning_rate)
+
+# Training loop
+for epoch in range(config.epochs):
+    model.train()
+    for inputs, labels in train_loader:
+        optimizer.zero_grad()
+        outputs = model(inputs)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+```
+
+```python Evaluation
+# Evaluate model
+model.eval()
+with torch.no_grad():
+    test_probs = model.predict_probability(X_test_tensor)
+    test_preds = model.binary_prediction(X_test_tensor, threshold=0.5)
+    
+    # Calculate metrics
+    from sklearn.metrics import accuracy_score, roc_auc_score
+    accuracy = accuracy_score(y_test, test_preds.numpy())
+    roc_auc = roc_auc_score(y_test, test_probs[:, 1].numpy())
+```
+</CodeGroup>
+
+## Source Reference
+
+Implementation: `python-projects/credit-score/model/model.py:58-151`

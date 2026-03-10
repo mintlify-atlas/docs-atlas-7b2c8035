@@ -1,0 +1,435 @@
+---
+title: 'Training Configuration'
+description: 'YAML configuration structure for model training experiments'
+---
+
+## Overview
+
+Training configurations are defined in YAML files that specify model architecture, hyperparameters, and training settings. These configurations enable reproducible experiments and easy hyperparameter tuning.
+
+## Configuration Structure
+
+### Complete Example
+
+<CodeGroup>
+```yaml model_config_001.yaml
+hidden_layers:
+  - 128
+  - 64
+  - 32
+activation_functions:
+  - relu
+  - relu
+  - relu
+dropout_rate: 0.3
+learning_rate: 0.0005
+epochs: 150
+batch_size: 64
+```
+</CodeGroup>
+
+---
+
+## Configuration Parameters
+
+### Network Architecture
+
+<ParamField path="hidden_layers" type="list[int]" required>
+  List of integers defining the number of neurons in each hidden layer.
+  
+  **Constraints:**
+  - Length must match `activation_functions` length
+  - Each value must be positive
+  - Typically decreasing sequence (e.g., [128, 64, 32])
+  
+  **Example:**
+  ```yaml
+  hidden_layers:
+    - 128  # First hidden layer
+    - 64   # Second hidden layer
+    - 32   # Third hidden layer
+  ```
+</ParamField>
+
+<ParamField path="activation_functions" type="list[str]" required>
+  List of activation function names for each hidden layer.
+  
+  **Allowed Values:**
+  - `relu` - Rectified Linear Unit (recommended for most cases)
+  - `leaky_relu` - Leaky ReLU with negative_slope=0.1
+  - `gelu` - Gaussian Error Linear Unit
+  - `sigmoid` - Sigmoid function
+  - `tanh` - Hyperbolic tangent
+  - `softmax` - Softmax (use for multi-class intermediate layers)
+  
+  **Constraints:**
+  - Length must match `hidden_layers` length
+  - One function per hidden layer
+  
+  **Example:**
+  ```yaml
+  activation_functions:
+    - relu
+    - relu
+    - relu
+  ```
+</ParamField>
+
+<Note>
+  The number of hidden layers and activation functions must be equal. A validation error will be raised if they don't match.
+</Note>
+
+---
+
+### Regularization
+
+<ParamField path="dropout_rate" type="float" required>
+  Dropout probability applied after each hidden layer to prevent overfitting.
+  
+  **Range:** 0.0 to 1.0
+  
+  **Recommendations:**
+  - Small models: 0.2 - 0.3
+  - Medium models: 0.3 - 0.5
+  - Large models: 0.5 - 0.7
+  
+  **Example:**
+  ```yaml
+  dropout_rate: 0.3  # 30% of neurons randomly dropped
+  ```
+</ParamField>
+
+<Note>
+  Dropout is only active during training. It's automatically disabled during evaluation and inference.
+</Note>
+
+---
+
+### Optimization
+
+<ParamField path="learning_rate" type="float" required>
+  Learning rate for the AdamW optimizer.
+  
+  **Typical Range:** 0.0001 to 0.01
+  
+  **Recommendations:**
+  - Start with: 0.001 (default)
+  - Large datasets: 0.0005 - 0.001
+  - Small datasets: 0.001 - 0.005
+  
+  **Example:**
+  ```yaml
+  learning_rate: 0.0005  # Conservative learning rate
+  ```
+</ParamField>
+
+<Note>
+  The training pipeline uses the AdamW optimizer, which includes weight decay regularization for better generalization.
+</Note>
+
+---
+
+### Training Duration
+
+<ParamField path="epochs" type="int" required>
+  Number of complete passes through the training dataset.
+  
+  **Typical Range:** 50 to 500
+  
+  **Recommendations:**
+  - Quick experiments: 50-100
+  - Standard training: 100-200
+  - Full training: 150-300
+  
+  **Example:**
+  ```yaml
+  epochs: 150  # Train for 150 complete iterations
+  ```
+</ParamField>
+
+---
+
+### Batch Processing
+
+<ParamField path="batch_size" type="int" required>
+  Number of samples processed before updating model weights.
+  
+  **Typical Range:** 16 to 512
+  
+  **Recommendations:**
+  - Limited memory: 16-32
+  - Standard: 32-64
+  - Large memory: 64-128
+  - Very large datasets: 128-512
+  
+  **Trade-offs:**
+  - Smaller batches: More updates, noisier gradients, better generalization
+  - Larger batches: Fewer updates, smoother gradients, faster training
+  
+  **Example:**
+  ```yaml
+  batch_size: 64  # Process 64 samples per batch
+  ```
+</ParamField>
+
+---
+
+## ModelConfig Dataclass
+
+The YAML configuration is parsed and mapped to the `ModelConfig` dataclass:
+
+<CodeGroup>
+```python ModelConfig Structure
+from dataclasses import dataclass
+from typing import Literal
+
+@dataclass
+class ModelConfig:
+    """Configuration for credit score model architecture"""
+    
+    input_size: int
+    hidden_layers: list[int]
+    activation_functions: list[
+        Literal["relu", "leaky_relu", "gelu", "sigmoid", "softmax", "tanh"]
+    ]
+    output_size: int = 1
+    dropout_rate: float = 0.2
+    learning_rate: float = 0.001
+    epochs: int = 100
+    batch_size: int = 32
+    checkpoint_path: str = "./model/checkpoint"
+```
+</CodeGroup>
+
+**Location:** `model/model.py:20`
+
+### Auto-Computed Fields
+
+<ParamField path="input_size" type="int">
+  Number of input features - automatically determined from preprocessed data.
+  
+  **Computed as:** `X_train.shape[1]`
+</ParamField>
+
+<ParamField path="output_size" type="int" default="1">
+  Number of output neurons - fixed at 1 for binary classification.
+</ParamField>
+
+<ParamField path="checkpoint_path" type="str" default="./model/checkpoint">
+  Directory for saving model checkpoints (not currently used in training loop).
+</ParamField>
+
+---
+
+## Configuration Examples
+
+### Small Model (Fast Training)
+
+<CodeGroup>
+```yaml small_model.yaml
+hidden_layers:
+  - 64
+  - 32
+activation_functions:
+  - relu
+  - relu
+dropout_rate: 0.2
+learning_rate: 0.001
+epochs: 100
+batch_size: 32
+```
+</CodeGroup>
+
+**Use Case:** Quick experiments, limited compute resources
+
+---
+
+### Medium Model (Balanced)
+
+<CodeGroup>
+```yaml medium_model.yaml
+hidden_layers:
+  - 128
+  - 64
+  - 32
+activation_functions:
+  - relu
+  - relu
+  - relu
+dropout_rate: 0.3
+learning_rate: 0.0005
+epochs: 150
+batch_size: 64
+```
+</CodeGroup>
+
+**Use Case:** Standard production training, good accuracy-speed trade-off
+
+---
+
+### Large Model (Maximum Capacity)
+
+<CodeGroup>
+```yaml large_model.yaml
+hidden_layers:
+  - 256
+  - 128
+  - 64
+  - 32
+activation_functions:
+  - relu
+  - relu
+  - relu
+  - relu
+dropout_rate: 0.4
+learning_rate: 0.0003
+epochs: 200
+batch_size: 128
+```
+</CodeGroup>
+
+**Use Case:** Maximum model capacity, large datasets, extended training time
+
+---
+
+### Alternative Activation Functions
+
+<CodeGroup>
+```yaml gelu_model.yaml
+hidden_layers:
+  - 128
+  - 64
+  - 32
+activation_functions:
+  - gelu
+  - gelu
+  - gelu
+dropout_rate: 0.3
+learning_rate: 0.0005
+epochs: 150
+batch_size: 64
+```
+</CodeGroup>
+
+**Use Case:** Experimenting with GELU activation (often used in transformer architectures)
+
+---
+
+## Usage in Training
+
+Configurations are loaded and applied during training initialization:
+
+<CodeGroup>
+```python Configuration Loading
+# Load configuration
+config = load_config('config/models-configs/model_config_001.yaml')
+
+# Create ModelConfig instance
+model_config = ModelConfig(
+    input_size=X_train.shape[1],
+    output_size=1,
+    hidden_layers=config['hidden_layers'],
+    activation_functions=config['activation_functions'],
+    dropout_rate=config['dropout_rate'],
+    learning_rate=config['learning_rate'],
+    epochs=config['epochs'],
+    batch_size=config['batch_size']
+)
+
+# Initialize model
+model = CreditScoreModel(model_config)
+```
+</CodeGroup>
+
+**Location:** `training/training.py:108`
+
+---
+
+## Best Practices
+
+### Naming Convention
+
+<CodeGroup>
+```bash
+model_config_001.yaml  # Baseline
+model_config_002.yaml  # Increased depth
+model_config_003.yaml  # Different activation
+model_config_004.yaml  # Tuned learning rate
+```
+</CodeGroup>
+
+**Benefits:**
+- Easy version tracking
+- Sequential experiment numbering
+- Automatic weight file naming (e.g., `model_weights_001.pth`)
+
+---
+
+### Hyperparameter Tuning Strategy
+
+1. **Start with baseline configuration**
+   ```yaml
+   hidden_layers: [128, 64, 32]
+   activation_functions: [relu, relu, relu]
+   dropout_rate: 0.3
+   learning_rate: 0.001
+   epochs: 100
+   batch_size: 32
+   ```
+
+2. **Tune learning rate first**
+   - Try: [0.0001, 0.0005, 0.001, 0.005]
+   - Monitor training loss convergence
+
+3. **Adjust network depth**
+   - Add/remove layers
+   - Ensure gradual size reduction
+
+4. **Optimize regularization**
+   - Increase dropout if overfitting
+   - Decrease dropout if underfitting
+
+5. **Fine-tune batch size**
+   - Balance speed vs. stability
+   - Consider GPU memory constraints
+
+---
+
+## Validation
+
+The training pipeline validates configuration parameters:
+
+<CodeGroup>
+```python Validation Example
+if len(config.hidden_layers) != len(config.activation_functions):
+    raise ValueError(
+        "The length of hidden_layers must equal the length of activation_functions"
+    )
+```
+</CodeGroup>
+
+**Location:** `model/model.py:66`
+
+<Note>
+  Invalid configurations will raise errors during model initialization, before training begins.
+</Note>
+
+---
+
+## MLflow Parameter Logging
+
+All configuration parameters are automatically logged to MLflow:
+
+<CodeGroup>
+```python Parameter Logging
+with mlflow.start_run(run_name=config_name):
+    mlflow.log_params(config)
+    mlflow.log_param("config_file", config_name)
+```
+</CodeGroup>
+
+This enables:
+- Experiment comparison
+- Hyperparameter analysis
+- Reproducible training runs
+- Configuration versioning

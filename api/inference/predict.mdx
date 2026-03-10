@@ -1,0 +1,345 @@
+---
+title: 'POST /credit_score_prediction'
+description: 'Predict credit risk (good/bad) based on customer data using deep learning'
+api: 'POST /credit_score_prediction'
+---
+
+## Overview
+
+This endpoint predicts whether a customer's credit risk is "good" or "bad" based on their demographic and financial information. The prediction is made using a PyTorch deep learning model that has been trained on historical credit data.
+
+## Endpoint
+
+```
+POST /credit_score_prediction
+```
+
+## Request Schema
+
+The request body must be a JSON object with the following fields:
+
+### Required Fields
+
+<ParamField body="Age" type="integer" required>
+  Age of the applicant in years. Must be greater than 0.
+  
+  **Example**: `35`
+</ParamField>
+
+<ParamField body="Sex" type="string" required>
+  Gender of the applicant.
+  
+  **Allowed values**: 
+  - `"male"`
+  - `"female"`
+  
+  **Example**: `"male"`
+</ParamField>
+
+<ParamField body="Job" type="string" required>
+  Skill level of the applicant's job.
+  
+  **Allowed values**:
+  - `"unskilled and non-resident"`
+  - `"unskilled and resident"`
+  - `"skilled"`
+  - `"highly skilled"`
+  
+  **Example**: `"skilled"`
+</ParamField>
+
+<ParamField body="Housing" type="string" required>
+  Type of housing for the applicant.
+  
+  **Allowed values**:
+  - `"own"` - Owns housing
+  - `"rent"` - Rents housing
+  - `"free"` - Free housing
+  
+  **Example**: `"own"`
+</ParamField>
+
+<ParamField body="Saving accounts" type="string" required>
+  Status of the savings account. Note the space in the field name.
+  
+  **Allowed values**:
+  - `"NA"` - No savings account
+  - `"little"` - Little savings
+  - `"moderate"` - Moderate savings
+  - `"quite rich"` - Quite rich savings
+  - `"rich"` - Rich savings
+  
+  **Example**: `"NA"`
+</ParamField>
+
+<ParamField body="Checking account" type="string" required>
+  Status of the checking account. Note the space in the field name.
+  
+  **Allowed values**:
+  - `"NA"` - No checking account
+  - `"little"` - Little balance
+  - `"moderate"` - Moderate balance
+  - `"rich"` - Rich balance
+  
+  **Example**: `"little"`
+</ParamField>
+
+<ParamField body="Credit amount" type="number" required>
+  Amount of credit requested. Must be greater than 0.
+  
+  **Example**: `9055.0`
+</ParamField>
+
+<ParamField body="Duration" type="integer" required>
+  Duration of the credit in months. Must be greater than 0.
+  
+  **Example**: `36`
+</ParamField>
+
+<ParamField body="Purpose" type="string" required>
+  Purpose of the credit.
+  
+  **Allowed values**:
+  - `"car"`
+  - `"furniture/equipment"`
+  - `"radio/TV"`
+  - `"domestic appliances"`
+  - `"repairs"`
+  - `"education"`
+  - `"business"`
+  - `"vacation/others"`
+  
+  **Example**: `"education"`
+</ParamField>
+
+## Response Schema
+
+The response is a JSON object with the following fields:
+
+<ResponseField name="prediction" type="string" required>
+  The predicted credit risk category.
+  
+  **Possible values**:
+  - `"good"` - Good credit risk
+  - `"bad"` - Bad credit risk
+</ResponseField>
+
+<ResponseField name="probability" type="number" required>
+  The probability that the credit risk is "good". Value between 0 and 1.
+  
+  **Range**: `0.0` to `1.0`
+  
+  **Note**: Higher values indicate higher confidence in a "good" prediction.
+</ResponseField>
+
+## Example Request
+
+<CodeGroup>
+
+```json Request Body
+{
+  "Age": 35,
+  "Sex": "male",
+  "Job": "unskilled and resident",
+  "Housing": "free",
+  "Saving accounts": "NA",
+  "Checking account": "NA",
+  "Credit amount": 9055,
+  "Duration": 36,
+  "Purpose": "education"
+}
+```
+
+```python Python
+import requests
+
+url = "http://localhost:8000/credit_score_prediction"
+
+payload = {
+    "Age": 35,
+    "Sex": "male",
+    "Job": "unskilled and resident",
+    "Housing": "free",
+    "Saving accounts": "NA",
+    "Checking account": "NA",
+    "Credit amount": 9055,
+    "Duration": 36,
+    "Purpose": "education"
+}
+
+response = requests.post(url, json=payload)
+result = response.json()
+
+print(f"Prediction: {result['prediction']}")
+print(f"Probability: {result['probability']:.4f}")
+```
+
+```javascript JavaScript/TypeScript
+const url = "http://localhost:8000/credit_score_prediction";
+
+const payload = {
+  Age: 35,
+  Sex: "male",
+  Job: "unskilled and resident",
+  Housing: "free",
+  "Saving accounts": "NA",
+  "Checking account": "NA",
+  "Credit amount": 9055,
+  Duration: 36,
+  Purpose: "education"
+};
+
+const response = await fetch(url, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(payload)
+});
+
+const result = await response.json();
+console.log(`Prediction: ${result.prediction}`);
+console.log(`Probability: ${result.probability.toFixed(4)}`);
+```
+
+```bash cURL
+curl -X POST "http://localhost:8000/credit_score_prediction" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "Age": 35,
+    "Sex": "male",
+    "Job": "unskilled and resident",
+    "Housing": "free",
+    "Saving accounts": "NA",
+    "Checking account": "NA",
+    "Credit amount": 9055,
+    "Duration": 36,
+    "Purpose": "education"
+  }'
+```
+
+</CodeGroup>
+
+## Example Response
+
+<CodeGroup>
+
+```json 200 Success
+{
+  "prediction": "good",
+  "probability": 0.8542
+}
+```
+
+```json 422 Validation Error
+{
+  "detail": [
+    {
+      "type": "enum",
+      "loc": ["body", "Sex"],
+      "msg": "Input should be 'male' or 'female'",
+      "input": "other",
+      "ctx": {
+        "expected": "'male' or 'female'"
+      }
+    }
+  ]
+}
+```
+
+```json 500 Internal Server Error
+{
+  "detail": "An error occurred during inference: Model file not found"
+}
+```
+
+</CodeGroup>
+
+## Response Status Codes
+
+<ResponseField name="200" type="OK">
+  Prediction completed successfully
+</ResponseField>
+
+<ResponseField name="422" type="Unprocessable Entity">
+  Invalid input data - validation failed
+</ResponseField>
+
+<ResponseField name="500" type="Internal Server Error">
+  Error during model inference
+</ResponseField>
+
+## Inference Pipeline
+
+The prediction process follows these steps:
+
+<Steps>
+  <Step title="Input Validation">
+    The request data is validated against the `CreditRiskInput` Pydantic schema to ensure all fields are present and have correct types and values.
+  </Step>
+  
+  <Step title="Data Preprocessing">
+    The input is transformed into a pandas DataFrame and processed using a scikit-learn preprocessor that handles:
+    - Categorical encoding
+    - Feature scaling
+    - Feature engineering
+  </Step>
+  
+  <Step title="Model Inference">
+    The preprocessed data is converted to a PyTorch tensor and passed through the deep learning model:
+    - The model outputs probabilities for both "bad" and "good" classes
+    - The prediction is determined by the class with the highest probability
+  </Step>
+  
+  <Step title="Response Generation">
+    The prediction result and probability are packaged into a `CreditRiskOutput` response object and returned as JSON.
+  </Step>
+</Steps>
+
+## Implementation Details
+
+<Expandable title="Source Code Reference">
+
+The endpoint is implemented in `server/api.py:58-84`:
+
+- **Handler**: `predict_credit_risk()`
+- **Input Schema**: `CreditRiskInput` (defined in `server/schemas.py`)
+- **Output Schema**: `CreditRiskOutput` (defined in `server/schemas.py`)
+- **Predictor**: Singleton instance from `inference/inference.py`
+
+</Expandable>
+
+<Expandable title="Model Architecture">
+
+The prediction model uses:
+
+- **Framework**: PyTorch
+- **Architecture**: Configurable multi-layer neural network
+- **Activation Functions**: Configurable (ReLU, Sigmoid, etc.)
+- **Dropout**: Applied for regularization
+- **Output**: Binary classification with probability scores
+
+</Expandable>
+
+## Important Notes
+
+<Warning>
+  **Field Names with Spaces**: The fields `"Saving accounts"` and `"Checking account"` contain spaces. Ensure you include the space when making requests, or the validation will fail.
+</Warning>
+
+<Info>
+  **Singleton Pattern**: The model is loaded once at startup using a singleton pattern. All prediction requests share the same model instance for optimal performance.
+</Info>
+
+<Note>
+  **CPU Inference**: The model runs on CPU by default. For high-throughput production deployments, consider configuring GPU support.
+</Note>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="API Overview" icon="book" href="/api/inference/overview">
+    Learn about the API architecture
+  </Card>
+  <Card title="Interactive Docs" icon="browser" href="http://localhost:8000/docs">
+    Try the API in Swagger UI
+  </Card>
+</CardGroup>
