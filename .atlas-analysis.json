@@ -1,0 +1,102 @@
+{
+  "projectType": "ai-ml",
+  "projectName": "AI Data Science Service",
+  "projectDescription": "Production-ready MLOps platform for building, training, and deploying machine learning models with end-to-end credit risk prediction service.",
+  "theme": "aspen",
+  "primaryColor": "#94cb04",
+  "lightColor": "#545454",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/mlops-architecture",
+              "concepts/project-structure",
+              "concepts/data-versioning"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/training-models",
+              "guides/model-configuration",
+              "guides/running-inference",
+              "guides/deployment",
+              "guides/mlflow-tracking"
+            ]
+          },
+          {
+            "group": "Use Cases",
+            "pages": [
+              "use-cases/credit-score-ai",
+              "use-cases/overview"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Inference API",
+            "pages": [
+              "api/inference/overview",
+              "api/inference/predict"
+            ]
+          },
+          {
+            "group": "Model Architecture",
+            "pages": [
+              "api/model/credit-score-model",
+              "api/model/configuration"
+            ]
+          },
+          {
+            "group": "Data Processing",
+            "pages": [
+              "api/processing/preprocessor",
+              "api/processing/schemas"
+            ]
+          },
+          {
+            "group": "Training",
+            "pages": [
+              "api/training/pipeline",
+              "api/training/configuration"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "PyTorch-based deep learning models for credit risk prediction",
+    "MLflow experiment tracking and model versioning",
+    "FastAPI REST API for real-time inference",
+    "DVC for dataset version control",
+    "Docker containerization for production deployment",
+    "Modular architecture with separate training and inference pipelines",
+    "YAML-based model configuration system",
+    "Comprehensive data preprocessing pipeline"
+  ],
+  "publicApiSurface": [
+    "POST /credit_score_prediction - Predict credit risk",
+    "CreditScoreModel - PyTorch neural network model",
+    "Predictor.inference() - Singleton inference class",
+    "preprocess_data() - Data preprocessing pipeline",
+    "train() - Model training pipeline",
+    "CreditRiskInput - Input validation schema",
+    "CreditRiskOutput - Prediction response schema"
+  ]
+}
